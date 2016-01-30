@@ -17,6 +17,10 @@
 				</ion-option-button>
 			</ion-item>
 		</ion-list>
+		<ion-infinite-scroll
+  		on-infinite="loadMore()" ng-if="!noMoreItemsAvailable"   		
+  		distance="1%">
+		</ion-infinite-scroll>
     </ion-content>
 </ion-view>
 

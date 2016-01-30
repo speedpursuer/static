@@ -11,7 +11,7 @@ angular.module('app.routes', [])
       abstract:true,
       templateUrl: 'templates/tabsController.html',
       resolve: {
-      init: function($stateParams, DBService) {
+        init: function($stateParams, DBService) {
           return DBService.init();
         },
         /*
@@ -59,8 +59,10 @@ angular.module('app.routes', [])
       resolve: {
         clips: function($stateParams, DBService) {          
           //return DBService.getClipsByPlayer($stateParams.playerID, $stateParams.moveName);          
-          return DBService.getClipsByPlayerInit($stateParams.playerID, $stateParams.moveName);          
-          //return DBService.clips($stateParams.playerID, $stateParams.moveName).more();
+          //return DBService.getClipsByPlayerInit($stateParams.playerID, $stateParams.moveName);          
+          //return DBService.clips().init($stateParams.playerID, $stateParams.moveName);
+          //return DBService.returnClips().init($stateParams.playerID, $stateParams.moveName);
+          return DBService.returnClips().init($stateParams.playerID, $stateParams.moveName);
         }
       },
       views: {
@@ -107,7 +109,8 @@ angular.module('app.routes', [])
       resolve: {
         clips: function($stateParams, DBService) {
           //return DBService.getClipsByPlayer($stateParams.playerID, $stateParams.moveName);          
-          return DBService.getClipsByPlayerInit($stateParams.playerID, $stateParams.moveName);
+          //return DBService.getClipsByPlayerInit($stateParams.playerID, $stateParams.moveName);
+          return DBService.returnClips().init($stateParams.playerID, $stateParams.moveName);
         }
       },
       views: {
@@ -138,11 +141,13 @@ angular.module('app.routes', [])
       url: '/favorite',
       /*
       cache: false,
+      
       resolve: {
         clips: function(DBService) {
-          return DBService.getFavorite();         
+          return DBService.returnFavorite().init();
         }
-      },*/
+      },
+      */
       views: {
         'tab4': {
           controller: 'FavorateCtrl',

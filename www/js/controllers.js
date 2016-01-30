@@ -27,13 +27,25 @@ angular.module('app.controllers', [])
 	$scope.playerName = $stateParams.playerName;
 	$scope.moveName = $stateParams.moveName;	
 	$scope.playingClipIndex = "";	
-	$scope.noMoreItemsAvailable = false;
+	$scope.noMoreItemsAvailable = DBService.returnClips().hasMore();
 
 	function setClipList(list) {
 		$scope.clips = list;
 		clipList = list;
 	}
 
+	$scope.loadMore = function() {
+  	DBService.returnClips().more().then(function(clips) {			
+			setClipList(clipList.concat(clips));
+			$scope.noMoreItemsAvailable = DBService.returnClips().hasMore();
+		}).catch(function (err) {              
+    	ErrorService.showAlert('Trouble in getting data');
+		}).finally(function() {
+    	$scope.$broadcast('scroll.infiniteScrollComplete');
+  	});    
+  };
+
+  /*
 	$scope.loadMore = function() {
   	DBService.getClipsByPlayer().then(function(clips) {			
 			setClipList(clipList.concat(clips));
@@ -42,7 +54,7 @@ angular.module('app.controllers', [])
 		}).finally(function() {
     	$scope.$broadcast('scroll.infiniteScrollComplete');
   	});    
-  };
+  };*/
 
 	$scope.play = function(index) {	
 		$scope.playingClipIndex = index;
@@ -83,6 +95,26 @@ angular.module('app.controllers', [])
  	$scope.listCanSwipe = true;
 	$scope.clips = DBService.getFavoriteList();	
 	$scope.playingClipIndex = "";
+	$scope.noMoreItemsAvailable = DBService.returnFavorite().hasMore();
+
+	function setClipList(list) {
+		$scope.clips = list;
+		clips = list;
+	}
+
+	$scope.loadMore = function() {
+  	DBService.returnFavorite().more().then(function() {			
+			//setClipList(clipList.concat(clips));
+			//$scope.clips = $scope.clips.concat(clips);
+			$scope.clips = DBService.getFavoriteList();
+			$scope.noMoreItemsAvailable = DBService.returnFavorite().hasMore();
+		}).catch(function (err) {              
+    	//$scope.noMoreItemsAvailable = true;
+    	ErrorService.showAlert('Trouble in getting data');
+		}).finally(function() {
+    	$scope.$broadcast('scroll.infiniteScrollComplete');
+  	});    
+  };
 	
 	$scope.play = function(index) {		
 		$scope.playingClipIndex = index;
@@ -131,8 +163,8 @@ angular.module('app.controllers', [])
 			}).catch(function (err) {              
 	    		ErrorService.showAlert('Trouble in getting data');
 	  		}).finally(function() {
-          		$scope.$broadcast('scroll.refreshComplete');
-          	});
+      		$scope.$broadcast('scroll.refreshComplete');
+      	});
 			} else {
 			$scope.$broadcast('scroll.refreshComplete');
 		}

@@ -3,6 +3,43 @@ input[type=range]
     width: 100%;
 }
 
+ion-tabs.tabs-color-active-assertive .tab-item.tab-item-active, .basketball{
+  color: #FF4000;
+}
+
+.tabs .tab-item .badge.badge-assertive, .badge.badge-assertive, .button.button-assertive {
+  background-color: #FF4000; 
+}
+
+.empty-message {
+  color: #D8D8D8;
+  text-align: center;
+  margin-top: 60% !important;
+}
+
+.item-select select {
+  padding: 0 28px 0 0px !important;
+}
+
+.popover .item:last-child
+{
+  border-bottom: 1px solid #ddd !important;
+}
+
+.popover .item:first-child
+{
+  /*border-top: 1px solid #ddd !important;*/
+}
+
+.popover-button 
+{
+  margin-left: 5%;
+  margin-right: 5%;  
+  width: 90%;
+  margin-top: 1.5em;
+}
+
+
 .margin-top-1em
 {
     margin-top: 1em !important;

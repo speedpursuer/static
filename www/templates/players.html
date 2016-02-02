@@ -1,6 +1,6 @@
 <ion-view title="所有球员">
     <ion-content>
-     	<ion-refresher
+        <ion-refresher
             pulling-text="下拉获取更新..."
             on-refresh="doRefresh()">
         </ion-refresher>
@@ -13,12 +13,12 @@
             </ion-item>
         </ion-list>
         -->
-        <div class="list">        	           	
-       	<a collection-repeat="item in players|orderBy:'clipQty':true" class="item item-avatar-left" ng-click='showMoves(item._id, item.name)'>        	
-	            <img img-cache-src-avatar ic-src="{{item.avatar}}">
-	            <h2 class="margin-top-05em">{{item.name}}</h2>	            
-                <span class="badge badge-assertive margin-top-05em">{{item.clipQty}}</span>	             
-           	</a>
+        <div class="list">                      
+        <a collection-repeat="item in players|orderBy:'clipQty':true" class="item item-avatar-left" ng-click='showMoves(item._id, item.name)'>          
+                <img img-cache-src-avatar ic-src="{{item.avatar}}">
+                <h2 class="margin-top-05em">{{item.name}}</h2>              
+                <span class="badge badge-assertive margin-top-05em">{{item.clipQty}}</span>              
+            </a>
        </div>
     </ion-content>
 </ion-view>

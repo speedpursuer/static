@@ -1,7 +1,7 @@
 <ion-view title="{{playerName}}" hide-tabs="'true'">
     <ion-content>       
 		<ion-list>
-			<ion-item ng-repeat="item in moves|orderBy:'clipQty':true" class="item-thumbnail-left" ng-click="showClips(item.name)">
+			<ion-item ng-repeat="item in moves|orderBy:'clipQty':true" class="item-thumbnail-left" ng-click="showClips(item.name, item._id)">
 				<img img-cache-src-move ic-src="{{item.image}}">			
 				<div class="row">
 					<div class="col col-top col-75 margin-top-1em"><h2>{{item.name}}</h2></div>									

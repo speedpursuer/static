@@ -1,16 +1,28 @@
 angular.module('app.controllers', [])
 
-.controller('StarsCtrl', function($scope, $ionicSlideBoxDelegate, $state, DBService, ErrorService, stars) {
+.controller('TabCtrl', function($state, $timeout) {
+
+	$timeout(function() {
+  	$state.go("tabsController.favorite").then(function(result) {
+			$timeout(function() {
+				$state.go("tabsController.stars");
+			}, 100);		
+		});	
+  }, 100);
+
+})	
+
+.controller('StarsCtrl', function($scope, $ionicSlideBoxDelegate, $state, ErrorService, stars) {
   	
 	(function() {
-		renderPlayList(stars);
+		renderPlayList(stars);		
 	}());	  
 
  	function renderPlayList(results) {
  		$scope.stars = results.docs;
-			$ionicSlideBoxDelegate.update();
-			$ionicSlideBoxDelegate.slide(0);
-			ErrorService.hideSplashScreen();
+		$ionicSlideBoxDelegate.update();
+		$ionicSlideBoxDelegate.slide(0);					
+		ErrorService.hideSplashScreen();			
  	}
 
  	$scope.showMoves = function(playerID, playerName) {
@@ -27,7 +39,7 @@ angular.module('app.controllers', [])
 	$scope.playerName = $stateParams.playerName;
 	$scope.moveName = $stateParams.moveName;	
 	$scope.playingClipIndex = "";	
-	$scope.noMoreItemsAvailable = DBService.returnClips().hasMore();
+	$scope.noMoreItemsAvailable = DBService.pagination().clips().hasNoMore();
 
 	function setClipList(list) {
 		$scope.clips = list;
@@ -35,26 +47,15 @@ angular.module('app.controllers', [])
 	}
 
 	$scope.loadMore = function() {
-  	DBService.returnClips().more().then(function(clips) {			
+  	DBService.pagination().clips().more().then(function(clips) {			
 			setClipList(clipList.concat(clips));
-			$scope.noMoreItemsAvailable = DBService.returnClips().hasMore();
+			$scope.noMoreItemsAvailable = DBService.pagination().clips().hasNoMore();
 		}).catch(function (err) {              
     	ErrorService.showAlert('Trouble in getting data');
 		}).finally(function() {
     	$scope.$broadcast('scroll.infiniteScrollComplete');
   	});    
   };
-
-  /*
-	$scope.loadMore = function() {
-  	DBService.getClipsByPlayer().then(function(clips) {			
-			setClipList(clipList.concat(clips));
-		}).catch(function (err) {              
-    	$scope.noMoreItemsAvailable = true;
-		}).finally(function() {
-    	$scope.$broadcast('scroll.infiniteScrollComplete');
-  	});    
-  };*/
 
 	$scope.play = function(index) {	
 		$scope.playingClipIndex = index;
@@ -90,26 +91,59 @@ angular.module('app.controllers', [])
 	}
 })
 
-.controller('FavorateCtrl', function($scope, $state, $ionicListDelegate, ErrorService, DBService, AnimationService) {
+.controller('FavorateCtrl', function($scope, $state, $ionicListDelegate, $ionicPopover, ErrorService, DBService, AnimationService) {
 	
  	$scope.listCanSwipe = true;
-	$scope.clips = DBService.getFavoriteList();	
+	$scope.clips = DBService.list().getFavoriteList();	
 	$scope.playingClipIndex = "";
-	$scope.noMoreItemsAvailable = DBService.returnFavorite().hasMore();
+	$scope.noMoreItemsAvailable = DBService.pagination().favorite().hasNoMore();
 
-	function setClipList(list) {
-		$scope.clips = list;
-		clips = list;
-	}
+	$scope.data = {  	
+    players: DBService.list().getPlayerList(),
+    moves: DBService.list().getMoveList()
+  };
+ 
+  $scope.search = {
+  	selected_player: "",
+  	selected_move: "",    
+    by_player: "",
+    by_move: "",
+  };
+
+  $ionicPopover.fromTemplateUrl('templates/popover.html', {
+    scope: $scope
+  }).then(function(popover) {
+    $scope.popover = popover;
+  });
+
+  $scope.openPopover = function($event) {
+  	$scope.search.by_player = $scope.search.selected_player;
+  	$scope.search.by_move = $scope.search.selected_move;
+    $scope.popover.show($event);
+  };
+
+  $scope.filter = function() {
+
+  	var search = {
+  		player: $scope.search.by_player,
+  		move: $scope.search.by_move
+  	};
+
+  	$scope.search.selected_player = $scope.search.by_player;
+  	$scope.search.selected_move = $scope.search.by_move;
+
+  	DBService.pagination().favorite().init(search).then(function() {					
+			$scope.clips = DBService.list().getFavoriteList();
+			$scope.noMoreItemsAvailable = DBService.pagination().favorite().hasNoMore();
+		})
+    $scope.popover.hide();
+  };
 
 	$scope.loadMore = function() {
-  	DBService.returnFavorite().more().then(function() {			
-			//setClipList(clipList.concat(clips));
-			//$scope.clips = $scope.clips.concat(clips);
-			$scope.clips = DBService.getFavoriteList();
-			$scope.noMoreItemsAvailable = DBService.returnFavorite().hasMore();
+  	DBService.pagination().favorite().more().then(function() {					
+			$scope.clips = DBService.list().getFavoriteList();
+			$scope.noMoreItemsAvailable = DBService.pagination().favorite().hasNoMore();
 		}).catch(function (err) {              
-    	//$scope.noMoreItemsAvailable = true;
     	ErrorService.showAlert('Trouble in getting data');
 		}).finally(function() {
     	$scope.$broadcast('scroll.infiniteScrollComplete');
@@ -124,6 +158,9 @@ angular.module('app.controllers', [])
 	$scope.removeFavorite = function(index) {	
 		$ionicListDelegate.closeOptionButtons();		
 		setFavorite(index);
+		if(DBService.pagination().favorite().needLoad()) {
+			$scope.loadMore();
+		}		
 	};
 	
 	$scope.updateThumbFromNative = function() {		
@@ -135,32 +172,21 @@ angular.module('app.controllers', [])
 	function setFavorite(index) {
 		DBService.updateFavorite($scope.clips[index]._id, $scope.clips[index].local, false);		
 	}
-	
-	/*
-	function groupClips(clips) {		
-		var i = clips.length, returnObj = {};		
-		while(i--) {
-			if(returnObj[clips[i].move]){
-	            returnObj[clips[i].move].push(clips[i]);
-	        }else{
-	            returnObj[clips[i].move] = [clips[i]];
-	        }
-		}
-		return returnObj;			
-	}*/
 })
 
 .controller('PlayersCtrl', function($scope, $state, DBService) {
 	
-	$scope.players = DBService.getPlayerList();
+	$scope.players = DBService.list().getPlayerList();
+
+	//DBService.remoteDB().change();
 	
 	$scope.doRefresh = function() {
-		DBService.syncRemote()
+		DBService.remoteDB().syncRemote()
 		.then(function(result) {
 			if(result.docs_written > 0) {
-			DBService.getAllPlayers().then(function() {
-				$scope.players = DBService.getPlayerList();
-			}).catch(function (err) {              
+				DBService.list().getAllPlayers().then(function() {
+					$scope.players = DBService.list().getPlayerList();
+				}).catch(function (err) {              
 	    		ErrorService.showAlert('Trouble in getting data');
 	  		}).finally(function() {
       		$scope.$broadcast('scroll.refreshComplete');
@@ -184,8 +210,8 @@ angular.module('app.controllers', [])
 	$scope.moves = moves;
 	$scope.playerName = $stateParams.playerName;
 
-	$scope.showClips = function(moveName) {
-		$state.go("tabsController.clips", {playerID: $stateParams.playerID, playerName: $stateParams.playerName, moveName: moveName});
+	$scope.showClips = function(moveName, moveID) {
+		$state.go("tabsController.clips", {playerID: $stateParams.playerID, moveName: moveName, moveID: moveID});
 	};
 
 })
@@ -195,8 +221,8 @@ angular.module('app.controllers', [])
 	$scope.moves = moves;
 	$scope.playerName = $stateParams.playerName;
 
-	$scope.showClips = function(moveName) {
-		$state.go("tabsController.tab2Clips", {playerID: $stateParams.playerID, playerName: $stateParams.playerName, moveName: moveName});
+	$scope.showClips = function(moveName, moveID) {
+		$state.go("tabsController.tab2Clips", {playerID: $stateParams.playerID, moveName: moveName, moveID: moveID});
 	};
 
 })
@@ -284,14 +310,14 @@ angular.module('app.controllers', [])
 
 	function setFavorite(index) {
 		DBService.updateFavorite(clipList[index]._id, clipList[index].local, !clipList[index].favorite);
-		//clipList[index].favorite = !clipList[index].favorite;
+		//clipList[index].favorite = !clipList[index].fagetClipsByPlayervorite;
 	}
 })
 
 $scope.doRefresh = function() {
   		DBService.syncRemote()
   		.then(function() {
-			DBService.getStars().then(function(results) {
+			DBService.getClipsByPlayer().then(function(results) {
 				renderPlayList(results);
 			}).catch(function (err) {              
 	    		ErrorService.showAlert('Trouble in getting data');
@@ -785,6 +811,18 @@ $scope.doRefresh = function() {
         }).catch(function (err) {
           	alert(err);
         });
+	}
+
+	function groupClips(clips) {		
+		var i = clips.length, returnObj = {};		
+		while(i--) {
+			if(returnObj[clips[i].move]){
+	            returnObj[clips[i].move].push(clips[i]);
+	        }else{
+	            returnObj[clips[i].move] = [clips[i]];
+	        }
+		}
+		return returnObj;			
 	}
 	*/
  

@@ -21,336 +21,353 @@ angular.module('app.services', [])
     }
     
     var db = pouchdb.create(string.dbName, {adapter: string.dbAdapter});
-            
-    var favoriteList = [];
-    var playerList = [];
-    var newsList = [];
 
     //deleteDB();
 
-    service.setNewsList = function(_list) {                                               
-        newsList = _list;        
+    service.list = function() {
+        return list;
+    };      
+
+    service.dataFetcher = function() {
+        return dataFetcher;
+    }; 
+
+    service.pagination = function() {
+        return pagination;
+    }; 
+
+    service.remoteDB = function() {
+        return remoteDB;
     };
 
-    service.getNewsList = function() {
-        return newsList;
+    var list = {
+        
+        favoriteList: [],
+        playerList: [],
+        moveList: [],
+
+        setMoveList: function(_list) {                                               
+            this.moveList = _list;       
+        },
+
+        getMoveList: function() {
+            return this.moveList;
+        },
+        
+        setPlayerList: function(_list) {                                               
+            this.playerList = _list;       
+        },
+
+        getPlayerList: function() {
+            return this.playerList;
+        },
+
+        setFavoriteList: function(_list) {     
+            if(this.favoriteList.length) {
+                this.favoriteList = this.favoriteList.concat(_list);
+            }else{
+                this.favoriteList = _list;           
+            }                   
+        },
+
+        resetFavoriteList: function() {     
+            this.favoriteList = [];                 
+        },
+
+        getFavoriteList: function(){
+            return this.favoriteList;
+        },
+
+        addFavoriteToList: function(clipID, thumb) {
+
+            for(var i=0;i<this.favoriteList.length;i++) {
+                if(this.favoriteList[i]._id == clipID) {                
+                    return;
+                }
+            }
+            var that = this;
+            getDoc(clipID).then(function(result){
+                result.thumb = thumb;
+                result.favorite = true;                
+                result.player = result.player? result.player: "";
+                result.move = result.move? result.move: "";
+                that.favoriteList.unshift(result);
+            });     
+        },
+
+        removeFavoriteFromList: function(clipID) {         
+            for(var i=0;i<this.favoriteList.length;i++) {
+                if(this.favoriteList[i]._id == clipID) {
+                    this.favoriteList.splice(i,1);
+                    return;
+                }
+            }
+        },
+
+        getMoves: function() {
+            return db.find({
+                selector: {type: 'move'}
+            });        
+        },
+
+        getAllPlayers: function() {       
+            return retrieveAllPlayers();
+        },
     };
 
-    service.getMoreNews = function() {
+    var dataFetcher = {
+        getStars: function() {
+            return db.find({
+                selector: {type: 'player', star: true}
+            });        
+        },
 
-        var deferred = $q.defer();
-     
-        db.query('views/local', options).then(function (result) {
+        getMoves: function() {
+            var deferred = $q.defer();
 
-            if (result && result.rows.length > 0) {
+            db.find({
+                selector: {type: 'move'},
+                fields: ['_id', 'move_name']
+            }).then(function(result){
+                list.setMoveList(result.docs);
+                deferred.resolve("Moves retrieved");
+            }).catch(function(){
+                deferred.reject("Moves not retrieved");
+            });
 
-                options.startkey = result.rows[result.rows.length - 1].key;
-                options.skip = 1;
+            return deferred.promise;
+        },
 
-                result = result.rows.map(function(row) {
-                    var thumb = "", favorite = false;
-                    if (row.doc) {
-                        thumb = row.doc.thumb;
-                        favorite = row.doc.favorite;
+        getMovesByPlayer: function(playerID) {
+            var deferred = $q.defer();
+            
+            db.query('views/moves', {startkey: [playerID], endkey: [playerID, {}], reduce: true, group: true}).then(function (result) {
+                          
+                var moves = [];
+
+                for(i in result.rows) {                                
+                    moves.push({_id: result.rows[i].key[4], name: result.rows[i].key[1], image: result.rows[i].key[2], desc: result.rows[i].key[3], clipQty: result.rows[i].value});
+                }
+                deferred.resolve(moves);
+
+            }).catch(function (err) {
+                deferred.reject(err);
+            }); 
+
+            return deferred.promise;       
+        },
+    };      
+
+    var pagination = {
+        
+        clips: function() {
+            return this.clipsPg;
+        },
+
+        favorite: function() {
+            return this.favoritePg;
+        },
+
+        clipsPg: {
+            options: {},
+            end: false,
+            limit: 6,    
+            descending: true,
+            init: function(playerID, moveID) {
+                this.options = {descending : this.descending, limit : this.limit, endkey: [playerID, moveID], startkey: [playerID, moveID, {}], reduce: true, group: true};
+                this.end = false;
+                return this.getClips();
+            },
+            
+            more: function() {
+                return this.getClips();  
+            },
+            
+            hasNoMore: function() {
+                return this.end;
+            },
+            
+            getClips: function() {
+
+                var deferred = $q.defer();
+
+                var that = this;
+
+                var _options = that.options;
+             
+                db.query('views/clips', _options).then(function (result) {
+
+                    if (result && result.rows.length > 0) {
+
+                        if(result.rows.length < that.limit) {
+                            that.end = true;
+                        }
+                        
+                        _options.startkey = result.rows[result.rows.length - 1].key;
+                        _options.skip = 1;
+                    
+                        var keys = [];
+                        
+                        for(i in result.rows) {
+                            keys.push(result.rows[i].value);
+                        }
+
+                        db.query('views/local', {include_docs : true, keys: keys}).then(function (result) {
+                                                           
+                            result = result.rows.map(function(row) {
+                                var thumb = "", favorite = false;
+                                if (row.doc) {
+                                    thumb = row.doc.thumb;
+                                    favorite = row.doc.favorite;
+                                }
+                                return {
+                                    _id: row.id,
+                                    name: row.value.name,
+                                    desc: row.value.desc,
+                                    image: row.value.image,
+                                    local: row.value.local,
+                                    thumb: thumb,
+                                    favorite: favorite                        
+                                };
+                            });
+                            
+                            deferred.resolve(result);             
+
+                        }).catch(function (err) {                
+                            deferred.reject(err);                
+                        });
+                    }else{
+                        that.end = true;                
+                        deferred.resolve("No more data");             
                     }
-                    return {
-                        _id: row.id,
-                        name: row.value.name,
-                        desc: row.value.desc,
-                        image: row.value.image,
-                        local: row.value.local,
-                        thumb: thumb,
-                        favorite: favorite                        
-                    };
+                }).catch(function (err) {
+                    deferred.reject(err);
                 });
 
-                deferred.resolve(result);
-            }else {
-                deferred.reject("no more data");    
+                return deferred.promise;
             }
-
-
-        }).catch(function (err) {                
-            deferred.reject(err);                
-        });
-
-        return deferred.promise;
-    }
-
-    service.getNewsUpdate = function() {
-        options = {limit : 5, descending : true, include_docs : true};
-        return service.getMoreNews();
-    };    
-
-    service.setPlayerList = function(_list) {                                               
-        playerList = _list;       
-    };
-
-    service.getPlayerList = function() {
-        return playerList;
-    };
-
-    service.getStars = function() {
-        return db.find({
-            selector: {type: 'player', star: true}
-        });        
-    };
-
-    service.getAllPlayers = function() {       
-        return retrieveAllPlayers();
-    };    
-		  
-    service.setFavoriteList = function(_list) {		
-        if(favoriteList.length) {
-            favoriteList = favoriteList.concat(_list);
-        }else{
-            favoriteList = _list;           
-        }	 			    
-    };
-
-	service.getFavoriteList = function(){
-	    return favoriteList;
-	};
-
-	service.addFavorite = function(clipID, thumb) {
-
-        for(var i=0;i<favoriteList.length;i++) {
-            if(favoriteList[i]._id == clipID) {                
-                return;
-            }
-        }
-
-        getDoc(clipID).then(function(result){
-            result.thumb = thumb;
-            result.favorite = true;
-            favoriteList.push(result);
-        });     
-    };
-
-	service.removeFavorite = function(clipID) {	    	
-    	for(var i=0;i<favoriteList.length;i++) {
-    		if(favoriteList[i]._id == clipID) {
-    			favoriteList.splice(i,1);
-    			return;
-    		}
-    	}
-    };
-
-    service.getMovesByPlayer = function(playerID) {
-        var deferred = $q.defer();
-        
-        db.query('views/moves', {startkey: [playerID], endkey: [playerID, {}], reduce: true, group: true}).then(function (result) {
-                      
-            var moves = [];
-
-            for(i in result.rows) {                                
-                moves.push({name: result.rows[i].key[1], image: result.rows[i].key[2], desc: result.rows[i].key[3], clipQty: result.rows[i].value});
-            }
-            deferred.resolve(moves);
-
-        }).catch(function (err) {
-            deferred.reject(err);
-        }); 
-
-        return deferred.promise;       
-    };
-
-    service.returnClips = function() {
-        return clips;
-    }
-
-    var clips = {
-        options: {},
-        end: false,
-        limit: 6,
-        init: function(playerID, moveName) {
-            this.options = {limit : this.limit, startkey: [playerID, moveName], endkey: [playerID, moveName, {}], reduce: true, group: true};
-            this.end = false;
-            return getClips(this);
         },
-        more: function() {
-            return getClips(this);  
-        },
-        hasMore: function() {
-            return this.end;
-        }
-    };
 
-    function getClips(favorite) {
+        favoritePg: {
+            options: {},
+            end: false,
+            limit: 6,
+            view: "",
+            descending: true,
+            init: function(search) {
 
-        var deferred = $q.defer();
+                if(!search) search = {};
 
-        var _options = favorite.options;
-     
-        db.query('views/clips', _options).then(function (result) {
+                list.resetFavoriteList();
 
-            if (result && result.rows.length > 0) {
-
-                if(result.rows.length < favorite.limit) {
-                    favorite.end = true;
-                }
-                
-                _options.startkey = result.rows[result.rows.length - 1].key;
-                _options.skip = 1;
-            
-                var keys = [];
-                
-                for(i in result.rows) {
-                    keys.push(result.rows[i].value);
+                if(search.player && search.move) {
+                    this.view = "favorite_player_move";
+                    //this.options = {descending : this.descending, limit : this.limit, include_docs: true, startkey: [true, search.player, search.move], endkey: [true, search.player, search.move, {}]};                
+                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true, search.player, search.move], startkey: [true, search.player, search.move, {}]};                
+                }else if(search.player) {
+                    this.view = "favorite_player";
+                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true, search.player], startkey: [true, search.player, {}]};                
+                }else if(search.move) {
+                    this.view = "favorite_move";
+                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true, search.move], startkey: [true, search.move, {}]};
+                }else {
+                    this.view = "favorite";
+                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true], startkey: [true, {}]};    
                 }
 
-                db.query('views/local', {include_docs : true, keys: keys}).then(function (result) {
-                                                   
-                    result = result.rows.map(function(row) {
-                        var thumb = "", favorite = false;
-                        if (row.doc) {
-                            thumb = row.doc.thumb;
-                            favorite = row.doc.favorite;
+                this.end = false;
+
+                return this.getFavorite();
+            },
+            more: function() {
+                return this.getFavorite();  
+            },
+            hasNoMore: function() {
+                return this.end;
+            },
+            needLoad: function() {
+                //return list.getFavoriteList().length < this.limit? true: false;
+                // if(!this.hasMore() && list.getFavoriteList().length < this.limit) {
+                //     this.more();
+                // }
+                if(!this.hasNoMore() && list.getFavoriteList().length < this.limit) {
+                    return true;
+                }else {
+                    return false;    
+                }                
+            },
+            getFavorite: function() {
+
+                var deferred = $q.defer();
+
+                var that = this;
+
+                var _options = that.options;
+
+                db.query('views/' + that.view, _options).then(function (result) {
+
+                    if (result && result.rows.length > 0) {
+
+                        if(result.rows.length < that.limit) {
+                            that.end = true;
                         }
-                        return {
-                            _id: row.id,
-                            name: row.value.name,
-                            desc: row.value.desc,
-                            image: row.value.image,
-                            local: row.value.local,
-                            thumb: thumb,
-                            favorite: favorite                        
-                        };
-                    });
-                    
-                    deferred.resolve(result);             
+                        
+                        _options.startkey = result.rows[result.rows.length - 1].key;
+                        _options.skip = 1;
+                                                       
+                        result = result.rows.map(function(row) {
+                        
+                            return {
+                                _id: row.doc._id,
+                                name: row.doc.name,
+                                desc: row.doc.desc,
+                                image: row.doc.image,
+                                thumb: row.value.thumb,
+                                favorite: row.key[0],
+                                local: row.id,
+                                player: row.doc.player? row.doc.player: "",
+                                move: row.doc.move? row.doc.move: "",
+                                timestamp: row.value.timestamp
+                            };
+                        });
+                        
+                        list.setFavoriteList(result);
+                        deferred.resolve("Favorite retrieved");                   
+
+                    }else{
+                        deferred.resolve("No more data");                   
+                        that.end = true;
+                    }
 
                 }).catch(function (err) {                
                     deferred.reject(err);                
                 });
-            }else{
-                favorite.end = true;                
-                deferred.resolve("No more data");             
-            }
-        }).catch(function (err) {
-            deferred.reject(err);
-        });
 
-        return deferred.promise;
-    }
-
-    service.returnFavorite = function() {
-        return favorite;
-    }
-
-    function initFavorite() {
-        return favorite.init();
-    }
-
-    var favorite = {
-        options: {},
-        end: false,
-        limit: 6,
-        init: function() {
-            this.options = {limit : this.limit, include_docs: true, startkey: [true], endkey: [true, {}]};
-            this.end = false;
-            this.end = false;
-            return getFavorite(this);
-        },
-        more: function() {
-            return getFavorite(this);  
-        },
-        hasMore: function() {
-            return this.end;
-        }  
-    }
-
-    function getFavorite(favorite) {
-
-        var deferred = $q.defer();
-
-        var _options = favorite.options;
-
-        db.query('views/favorite', _options).then(function (result) {
-
-            if (result && result.rows.length > 0) {
-
-                if(result.rows.length < favorite.limit) {
-                    favorite.end = true;
-                }
-                
-                _options.startkey = result.rows[result.rows.length - 1].key;
-                _options.skip = 1;
-                                               
-                result = result.rows.map(function(row) {
-                    return {
-                        _id: row.doc._id,
-                        name: row.doc.name,
-                        desc: row.doc.desc,
-                        image: row.doc.image,
-                        thumb: row.value.thumb,
-                        favorite: row.key[0],
-                        local: row.id
-                    };
-                });
-                
-                service.setFavoriteList(result);
-                deferred.resolve("Favorite retrieved");                   
-
-            }else{
-                //deferred.reject("No more data");
-                deferred.resolve("No more data");                   
-                favorite.end = true;
-            }
-
-        }).catch(function (err) {                
-            deferred.reject(err);                
-        });
-
-        return deferred.promise;
-    }
-
-    service.getClipsByPlayer = function(playerID, moveName) {
-
-        var deferred = $q.defer();
-     
-        db.query('views/clips', {startkey: [playerID, moveName], endkey: [playerID, moveName, {}], reduce: true, group: true}).then(function (result) {
-            
-            var keys = [];
-            
-            for(i in result.rows) {
-                keys.push(result.rows[i].value);
-            }
-
-            db.query('views/local', {include_docs : true, keys: keys}).then(function (result) {
-                                               
-                result = result.rows.map(function(row) {
-                    var thumb = "", favorite = false;
-                    if (row.doc) {
-                        thumb = row.doc.thumb;
-                        favorite = row.doc.favorite;
-                    }
-                    return {
-                        _id: row.id,
-                        name: row.value.name,
-                        desc: row.value.desc,
-                        image: row.value.image,
-                        local: row.value.local,
-                        thumb: thumb,
-                        favorite: favorite                        
-                    };
-                });
-                
-                deferred.resolve(result);             
-
-            }).catch(function (err) {                
-                deferred.reject(err);                
-            });
-        }).catch(function (err) {
-            deferred.reject(err);
-        });
-
-        return deferred.promise;
+                return deferred.promise;
+            }  
+        }
     };
-    
-    service.syncRemote = function() {
-        return syncFromRemote();
+
+    var remoteDB = {
+        syncRemote: function() {
+            return syncFromRemote();
+        },    
+
+        change: function() {
+            db.changes({
+                limit: 10,
+                since: 73
+            }).then(function (result) {
+                console.log(result);
+            }).catch(function (err) {
+                console.log(err);
+            }); 
+        }   
     };
+
+    // service.syncRemote = function() {
+    //     return syncFromRemote();
+    // };
 
     service.put = function(doc) {
         return db.put(doc);
@@ -374,24 +391,30 @@ angular.module('app.services', [])
 
         db.get(clipID).then(function(clip) {
             db.get(clip.local).then(function(local) {
+                var date = new Date();
                 local.thumb = clip.image + post_fix;
-                local.favorite = favorite;
+                local.favorite = favorite;                
+                local.timestamp = "" + date.getTime();
                 db.put(local);
             }).catch(function(){
+                var date = new Date();
                 var local = {
                     _id: clip.local,
                     type: "local",
                     favorite: favorite,
                     thumb: clip.image + post_fix,
-                    clip: clipID            
+                    clip: clipID,
+                    player: clip.player? clip.player: "",
+                    move: clip.move? clip.move: "",
+                    timestamp: "" + date.getTime()            
                 }
                 db.put(local);
             });  
 
             if(favorite) {
-                service.addFavorite(clipID, clip.image + post_fix);
+                list.addFavoriteToList(clipID, clip.image + post_fix);
             } else {
-                service.removeFavorite(clipID);
+                list.removeFavoriteFromList(clipID);
             }                                  
         });
 
@@ -414,24 +437,34 @@ angular.module('app.services', [])
 
         db.get(localID).then(function(local) {
             local.favorite = flag;
+            var date = new Date();
+            local.timestamp = "" + date.getTime();
             db.put(local);      
             if(flag) {
-                service.addFavorite(clipID, local.thumb);
+                list.addFavoriteToList(clipID, local.thumb);
             } else {
-                service.removeFavorite(clipID);
+                list.removeFavoriteFromList(clipID);
             }          
         }).catch(function(){
-            var local = {
-                _id: localID,
-                type: "local",
-                favorite: flag,
-                thumb: "",
-                clip: clipID               
-            }
-            db.put(local);
-            service.addFavorite(clipID, "");
-        });   
 
+            db.get(clipID).then(function(clip) {
+
+                var date = new Date();
+                
+                var local = {
+                    _id: localID,
+                    type: "local",
+                    favorite: flag,
+                    thumb: "",
+                    clip: clipID,
+                    player: clip.player? clip.player: "",
+                    move: clip.move? clip.move: "",
+                    timestamp: "" + date.getTime()
+                }
+                db.put(local);
+                list.addFavoriteToList(clipID, "");
+            });
+        });   
         //updateList(newsList);     
     };
 
@@ -467,15 +500,10 @@ angular.module('app.services', [])
             });         
         });    
 
-        updateList(favoriteList);
+        updateList(list.getFavoriteList());
         updateList(curClipList);
         //updateList(newsList);            
     };
-
-    function initFail() {
-        ErrorService.showModal();
-        ErrorService.hideSplashScreen();        
-    }
 
     service.init = function() {
         var deferred = $q.defer();    
@@ -484,6 +512,7 @@ angular.module('app.services', [])
             syncFromRemote().then(function(){                                   
                 retrieveAllPlayers()
                 .then(initFavorite)
+                .then(retrieveAllMoves)
                 .then(function() {
                     deferred.resolve("DB Existed");
                 }).catch(function(err){                    
@@ -493,6 +522,7 @@ angular.module('app.services', [])
             }).catch(function(){                        
                 retrieveAllPlayers()
                 .then(initFavorite)
+                .then(retrieveAllMoves)
                 .then(function() {
                     deferred.resolve("DB Existed");
                     ErrorService.showAlert(string.network_err);
@@ -503,11 +533,13 @@ angular.module('app.services', [])
             });            
         }).catch(function() {
             syncFromRemote()
-            .then(setupView)
-            .then(setUpIndex)
-            .then(markInstalled)
+            .then(setupView)            
+            .then(setUpIndex)                    
             .then(retrieveAllPlayers)
             .then(initFavorite)
+            .then(retrieveAllMoves)            
+            .then(verifyView)
+            .then(markInstalled)    
             .then(function() {
                 deferred.resolve("DB Created");
             }).catch(function (err){                
@@ -518,6 +550,37 @@ angular.module('app.services', [])
       
         return deferred.promise;        
     };
+
+    function verifyView() {
+        var deferred = $q.defer();      
+
+        var playerID = list.getPlayerList()[0]._id;    
+
+        dataFetcher.getMovesByPlayer(playerID).then(function(result){
+            var moveID = result[0]._id;
+            pagination.clips().init(playerID, moveID).then(function(result) {
+                deferred.resolve("Index verified");
+            }).catch(function() {
+                deferred.reject(err);
+            })
+        }).catch(function() {
+            deferred.reject(err);
+        })
+        return deferred.promise;        
+    }
+
+    function initFail() {
+        ErrorService.showModal();
+        ErrorService.hideSplashScreen();        
+    }
+
+    function initFavorite() {
+        return pagination.favorite().init();
+    }
+
+    function retrieveAllMoves() {
+        return dataFetcher.getMoves();
+    }
 
     function getDoc(id) {
         return db.get(id);
@@ -548,7 +611,7 @@ angular.module('app.services', [])
                     return row.doc;
                 });
 
-                service.setPlayerList(result);
+                list.setPlayerList(result);
 
                 deferred.resolve("All players retrieved");
 
@@ -561,35 +624,6 @@ angular.module('app.services', [])
         });
 
         return deferred.promise;
-    }
-
-    function retrieveFavorite() {
-
-        var deferred = $q.defer();
-        
-        db.query('views/favorite', {include_docs : true, keys: [true]}).then(function (result) {
-                                               
-            result = result.rows.map(function(row) {
-                return {
-                    _id: row.doc._id,
-                    name: row.doc.name,
-                    desc: row.doc.desc,
-                    image: row.doc.image,
-                    thumb: row.value.thumb,
-                    favorite: row.key,
-                    local: row.id
-                };
-            });
-
-            service.setFavoriteList(result);
-
-            deferred.resolve("Favorite retrieved");                        
-
-        }).catch(function (err) {                
-            deferred.reject(err);                
-        });    
-
-        return deferred.promise;   
     }
 
     function deleteDB() {      
@@ -627,7 +661,7 @@ angular.module('app.services', [])
                         if (doc.move_name && doc.clip_player && doc.image) {
                             for (clip in doc.clip_player) {
                                 player = doc.clip_player[clip];                                
-                                emit([player, doc.move_name, doc.image, doc.desc], 1);
+                                emit([player, doc.move_name, doc.image, doc.desc, doc._id], 1);
                             }
                         }
                     }.toString(),
@@ -641,7 +675,7 @@ angular.module('app.services', [])
                         if (doc.move_name && doc.clip_player) {
                             for (clip in doc.clip_player) {
                                 player = doc.clip_player[clip];
-                                emit([player, doc.move_name, clip], clip);
+                                emit([player, doc._id, clip], clip);
                             }
                         }
                     }.toString()                     
@@ -656,7 +690,28 @@ angular.module('app.services', [])
                 favorite: {
                     map: function(doc) { 
                         if (doc.type === 'local') {
-                            emit([doc.favorite, doc.clip], {_id : doc.clip, thumb: doc.thumb});
+                            emit([doc.favorite, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
+                        }
+                    }.toString()
+                },
+                favorite_player_move: {
+                    map: function(doc) { 
+                        if (doc.type === 'local') {
+                            emit([doc.favorite, doc.player, doc.move, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
+                        }
+                    }.toString()
+                },
+                favorite_player: {
+                    map: function(doc) { 
+                        if (doc.type === 'local') {
+                            emit([doc.favorite, doc.player, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
+                        }
+                    }.toString()
+                },
+                favorite_move: {
+                    map: function(doc) { 
+                        if (doc.type === 'local') {
+                            emit([doc.favorite, doc.move, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
                         }
                     }.toString()
                 }
@@ -818,6 +873,303 @@ angular.module('app.services', [])
 })
 
 /*
+
+getClipsByPlayer: function(playerID, moveName) {
+
+            var deferred = $q.defer();
+         
+            db.query('views/clips', {startkey: [playerID, moveName], endkey: [playerID, moveName, {}], reduce: true, group: true}).then(function (result) {
+                
+                var keys = [];
+                
+                for(i in result.rows) {
+                    keys.push(result.rows[i].value);
+                }
+
+                db.query('views/local', {include_docs : true, keys: keys}).then(function (result) {
+                                                   
+                    result = result.rows.map(function(row) {
+                        var thumb = "", favorite = false;
+                        if (row.doc) {
+                            thumb = row.doc.thumb;
+                            favorite = row.doc.favorite;
+                        }
+                        return {
+                            _id: row.id,
+                            name: row.value.name,
+                            desc: row.value.desc,
+                            image: row.value.image,
+                            local: row.value.local,
+                            thumb: thumb,
+                            favorite: favorite                        
+                        };
+                    });
+                    
+                    deferred.resolve(result);             
+
+                }).catch(function (err) {                
+                    deferred.reject(err);                
+                });
+            }).catch(function (err) {
+                deferred.reject(err);
+            });
+
+            return deferred.promise;
+        }  
+var favorite = {
+        options: {},
+        end: false,
+        limit: 6,
+        init: function() {
+            this.options = {limit : this.limit, include_docs: true, startkey: [true], endkey: [true, {}]};
+            this.end = false;
+            return getFavorite(this);
+        },
+        more: function() {
+            return getFavorite(this);  
+        },
+        hasMore: function() {
+            return this.end;
+        }  
+    }
+
+// function retrieveFavorite() {
+
+    //     var deferred = $q.defer();
+        
+    //     db.query('views/favorite', {include_docs : true, keys: [true]}).then(function (result) {
+                                               
+    //         result = result.rows.map(function(row) {
+    //             return {
+    //                 _id: row.doc._id,
+    //                 name: row.doc.name,
+    //                 desc: row.doc.desc,
+    //                 image: row.doc.image,
+    //                 thumb: row.value.thumb,
+    //                 favorite: row.key,
+    //                 local: row.id
+    //             };
+    //         });
+
+    //         service.setFavoriteList(result);
+
+    //         deferred.resolve("Favorite retrieved");                        
+
+    //     }).catch(function (err) {                
+    //         deferred.reject(err);                
+    //     });    
+
+    //     return deferred.promise;   
+    // }
+
+ // service.returnClips = function() {
+    //     return clips;
+    // }
+
+    // var clips = {
+    //     options: {},
+    //     end: false,
+    //     limit: 6,
+    //     init: function(playerID, moveName) {
+    //         this.options = {limit : this.limit, startkey: [playerID, moveName], endkey: [playerID, moveName, {}], reduce: true, group: true};
+    //         this.end = false;
+    //         return getClips(this);
+    //     },
+    //     more: function() {
+    //         return getClips(this);  
+    //     },
+    //     hasMore: function() {
+    //         return this.end;
+    //     }
+    // };
+
+    // function getClips(favorite) {
+
+    //     var deferred = $q.defer();
+
+    //     var _options = favorite.options;
+     
+    //     db.query('views/clips', _options).then(function (result) {
+
+    //         if (result && result.rows.length > 0) {
+
+    //             if(result.rows.length < favorite.limit) {
+    //                 favorite.end = true;
+    //             }
+                
+    //             _options.startkey = result.rows[result.rows.length - 1].key;
+    //             _options.skip = 1;
+            
+    //             var keys = [];
+                
+    //             for(i in result.rows) {
+    //                 keys.push(result.rows[i].value);
+    //             }
+
+    //             db.query('views/local', {include_docs : true, keys: keys}).then(function (result) {
+                                                   
+    //                 result = result.rows.map(function(row) {
+    //                     var thumb = "", favorite = false;
+    //                     if (row.doc) {
+    //                         thumb = row.doc.thumb;
+    //                         favorite = row.doc.favorite;
+    //                     }
+    //                     return {
+    //                         _id: row.id,
+    //                         name: row.value.name,
+    //                         desc: row.value.desc,
+    //                         image: row.value.image,
+    //                         local: row.value.local,
+    //                         thumb: thumb,
+    //                         favorite: favorite                        
+    //                     };
+    //                 });
+                    
+    //                 deferred.resolve(result);             
+
+    //             }).catch(function (err) {                
+    //                 deferred.reject(err);                
+    //             });
+    //         }else{
+    //             favorite.end = true;                
+    //             deferred.resolve("No more data");             
+    //         }
+    //     }).catch(function (err) {
+    //         deferred.reject(err);
+    //     });
+
+    //     return deferred.promise;
+    // }
+
+// var favoriteList = [];
+    // var playerList = [];
+
+    //deleteDB();
+
+    // service.setPlayerList = function(_list) {                                               
+    //     playerList = _list;       
+    // };
+
+    // service.getPlayerList = function() {
+    //     return playerList;
+    // };
+
+    // service.getStars = function() {
+    //     return db.find({
+    //         selector: {type: 'player', star: true}
+    //     });        
+    // };
+
+    // service.getAllPlayers = function() {       
+    //     return retrieveAllPlayers();
+    // };    
+          
+ //    service.setFavoriteList = function(_list) {      
+ //        if(favoriteList.length) {
+ //            favoriteList = favoriteList.concat(_list);
+ //        }else{
+ //            favoriteList = _list;           
+ //        }                    
+ //    };
+
+ //    service.resetFavoriteList = function() {     
+ //        favoriteList = [];                 
+ //    };
+
+    // service.getFavoriteList = function(){
+    //     return favoriteList;
+    // };
+
+    // service.addFavorite = function(clipID, thumb) {
+
+ //        for(var i=0;i<favoriteList.length;i++) {
+ //            if(favoriteList[i]._id == clipID) {                
+ //                return;
+ //            }
+ //        }
+
+ //        getDoc(clipID).then(function(result){
+ //            result.thumb = thumb;
+ //            result.favorite = true;
+ //            
+ //            var players = "", moves = "";
+
+ //            if(result.player_move) {
+ //                for(i in result.player_move) {
+ //                    players += i;
+ //                    moves += result.player_move[i];
+ //                }
+ //            }
+
+ //            result.players = players;
+ //            result.moves = moves;
+ //            
+ //            favoriteList.unshift(result);
+ //        });     
+ //    };
+
+    // service.removeFavorite = function(clipID) {          
+ //     for(var i=0;i<favoriteList.length;i++) {
+ //         if(favoriteList[i]._id == clipID) {
+ //             favoriteList.splice(i,1);
+ //             return;
+ //         }
+ //     }
+ //    };
+
+service.setNewsList = function(_list) {                                               
+        newsList = _list;        
+    };
+
+    service.getNewsList = function() {
+        return newsList;
+    };
+
+    service.getMoreNews = function() {
+
+        var deferred = $q.defer();
+     
+        db.query('views/local', options).then(function (result) {
+
+            if (result && result.rows.length > 0) {
+
+                options.startkey = result.rows[result.rows.length - 1].key;
+                options.skip = 1;
+
+                result = result.rows.map(function(row) {
+                    var thumb = "", favorite = false;
+                    if (row.doc) {
+                        thumb = row.doc.thumb;
+                        favorite = row.doc.favorite;
+                    }
+                    return {
+                        _id: row.id,
+                        name: row.value.name,
+                        desc: row.value.desc,
+                        image: row.value.image,
+                        local: row.value.local,
+                        thumb: thumb,
+                        favorite: favorite                        
+                    };
+                });
+
+                deferred.resolve(result);
+            }else {
+                deferred.reject("no more data");    
+            }
+
+
+        }).catch(function (err) {                
+            deferred.reject(err);                
+        });
+
+        return deferred.promise;
+    }
+
+    service.getNewsUpdate = function() {
+        options = {limit : 5, descending : true, include_docs : true};
+        return service.getMoreNews();
+    };  
 
 service.init_ = function() {
         var deferred = $q.defer();    

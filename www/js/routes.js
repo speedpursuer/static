@@ -2,7 +2,7 @@ angular.module('app.routes', [])
 
 .config(function($stateProvider, $urlRouterProvider) {
 
-  $urlRouterProvider.otherwise('/tab/stars');
+  $urlRouterProvider.otherwise('/tab/players');
 
   $stateProvider
 
@@ -10,17 +10,11 @@ angular.module('app.routes', [])
       url: '/tab',
       abstract:true,
       templateUrl: 'templates/tabsController.html',
+      controller: 'TabCtrl',
       resolve: {
-        init: function($stateParams, DBService) {
+        init: function(DBService) {
           return DBService.init();
-        },
-        /*
-        init: function($stateParams, DBService) {
-          return DBService.init();
-        },        
-        init: function($stateParams, FavoriteService) {
-          return FavoriteService.setItems();
-        }*/
+        }     
       },
     })
         
@@ -28,7 +22,7 @@ angular.module('app.routes', [])
       url: '/stars',
       resolve: {
         stars: function($stateParams, DBService, init) {
-          return DBService.getStars();
+          return DBService.dataFetcher().getStars();
         }
       },
       views: {
@@ -43,7 +37,7 @@ angular.module('app.routes', [])
       url: '/moves/:playerID, :playerName',
       resolve: {
         moves: function($stateParams, DBService) {
-          return DBService.getMovesByPlayer($stateParams.playerID);
+          return DBService.dataFetcher().getMovesByPlayer($stateParams.playerID);
         }
       },
       views: {
@@ -55,14 +49,11 @@ angular.module('app.routes', [])
     })  
 
     .state('tabsController.clips', {      
-      url: '/clips/:playerID, :playerName, :moveName',
+      url: '/clips/:playerID, :moveName, :moveID',
       resolve: {
         clips: function($stateParams, DBService) {          
-          //return DBService.getClipsByPlayer($stateParams.playerID, $stateParams.moveName);          
-          //return DBService.getClipsByPlayerInit($stateParams.playerID, $stateParams.moveName);          
-          //return DBService.clips().init($stateParams.playerID, $stateParams.moveName);
-          //return DBService.returnClips().init($stateParams.playerID, $stateParams.moveName);
-          return DBService.returnClips().init($stateParams.playerID, $stateParams.moveName);
+          //return DBService.getClipsByPlayer($stateParams.playerID, $stateParams.moveName);                    
+          return DBService.pagination().clips().init($stateParams.playerID, $stateParams.moveID);
         }
       },
       views: {
@@ -93,7 +84,7 @@ angular.module('app.routes', [])
       url: '/moves2/:playerID, :playerName',
       resolve: {
         moves: function($stateParams, DBService) {
-          return DBService.getMovesByPlayer($stateParams.playerID);
+          return DBService.dataFetcher().getMovesByPlayer($stateParams.playerID);
         }
       },
       views: {
@@ -105,12 +96,11 @@ angular.module('app.routes', [])
     })  
 
     .state('tabsController.tab2Clips', {
-      url: '/clips2/:playerID, :playerName, :moveName',
+      url: '/clips2/:playerID, :moveName, :moveID',
       resolve: {
         clips: function($stateParams, DBService) {
-          //return DBService.getClipsByPlayer($stateParams.playerID, $stateParams.moveName);          
-          //return DBService.getClipsByPlayerInit($stateParams.playerID, $stateParams.moveName);
-          return DBService.returnClips().init($stateParams.playerID, $stateParams.moveName);
+          //return DBService.getClipsByPlayer($stateParams.playerID, $stateParams.moveName);                    
+          return DBService.pagination().clips().init($stateParams.playerID, $stateParams.moveID);
         }
       },
       views: {
@@ -121,27 +111,10 @@ angular.module('app.routes', [])
       }
     })  
 
-    .state('tabsController.news', {      
-      url: '/news',
-      /*
-      resolve: {
-        clips: function(DBService) {          
-          return DBService.getAllClips();          
-        }
-      },*/
-      views: {
-        'tab3': {
-          controller: 'NewsCtrl',
-          templateUrl: 'templates/news.html',
-        }
-      }
-    }) 
-  
     .state('tabsController.favorite', {
       url: '/favorite',
       /*
-      cache: false,
-      
+      cache: false,      
       resolve: {
         clips: function(DBService) {
           return DBService.returnFavorite().init();
@@ -159,6 +132,21 @@ angular.module('app.routes', [])
 
 
 /*
+ .state('tabsController.news', {      
+      url: '/news',
+      
+      resolve: {
+        clips: function(DBService) {          
+          return DBService.getAllClips();          
+        }
+      },
+      views: {
+        'tab3': {
+          controller: 'NewsCtrl',
+          templateUrl: 'templates/news.html',
+        }
+      }
+    }) 
  .state('tabsController.play', {
       url: '/play/:fileURL, :clipID',      
       resolve: {

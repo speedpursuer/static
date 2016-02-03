@@ -10,14 +10,38 @@ angular.element(document).ready(function () {
         console.log("Running in browser, bootstrapping AngularJS now.");        
         angular.bootstrap(document.body, ['app']);
     }
-	
-	/*
-	function javaScriptCall(){
-		var scope = angular.element(document.getElementById('idForJS')).scope();
-		scope.test();
-	}*/
 });
 
+function updateClip(favorite, load, from) {
+    
+    if(from === "clip") {
+        var scope = angular.element(document.getElementById('ClipsScopeID')).scope();
+            
+        if(load !== "") {
+            if(favorite === 'favorite') {
+                scope.updateBothFromNative(load);                
+            }else{
+                scope.updateThumbFromNative(load);
+            }
+        }else if(favorite === 'favorite') {
+            scope.updateFavoriteFromNative();
+        }
+
+    } else if(load !== "") {
+        var scope = angular.element(document.getElementById('FavoriteScopeID')).scope();
+        scope.updateThumbFromNative(load);
+    }
+}
+
+/*
+function test_test(favorite, load, from) {
+    alert("favorite: " + favorite + "; load = " + load + "; from = " + from);
+}
+
+function javaScriptCall(){
+    var scope = angular.element(document.getElementById('idForJS')).scope();
+    scope.test();
+}
 function updateClipThumb(){
 	var scope = angular.element(document.getElementById('ClipsScopeID')).scope();
 	scope.updateThumbFromNative();
@@ -36,4 +60,4 @@ function updateClipFavorite(){
 function updateClipBoth(){
     var scope = angular.element(document.getElementById('ClipsScopeID')).scope();
     scope.updateBothFromNative();
-}
+}*/

@@ -3,7 +3,7 @@ angular.module('app.controllers', [])
 .controller('TabCtrl', function($state, $timeout) {
 
 	$timeout(function() {
-  	$state.go("tabsController.favorite").then(function(result) {
+  	$state.go("tabsController.players").then(function(result) {
 			$timeout(function() {
 				$state.go("tabsController.stars");
 			}, 100);		
@@ -30,7 +30,7 @@ angular.module('app.controllers', [])
 	};	
 })
    
-.controller('ClipsCtrl', function($scope, $state, $stateParams, $ionicListDelegate, FileCacheService, DBService, ErrorService, AnimationService, clips) {
+.controller('ClipsCtrl', function($scope, $state, $stateParams, $ionicListDelegate, FileCacheService, DBService, ErrorService, NativeService, clips) {
 	
 	var clipList = clips;
 
@@ -51,7 +51,7 @@ angular.module('app.controllers', [])
 			setClipList(clipList.concat(clips));
 			$scope.noMoreItemsAvailable = DBService.pagination().clips().hasNoMore();
 		}).catch(function (err) {              
-    	ErrorService.showAlert('Trouble in getting data');
+    	ErrorService.showAlert('获取数据失败');
 		}).finally(function() {
     	$scope.$broadcast('scroll.infiniteScrollComplete');
   	});    
@@ -59,7 +59,7 @@ angular.module('app.controllers', [])
 
 	$scope.play = function(index) {	
 		$scope.playingClipIndex = index;
-		AnimationService.playAnimation(clipList[index].image, clipList[index].favorite, true);
+		NativeService.playAnimation(clipList[index].image, clipList[index].favorite, true);
 	};
 
 	$scope.updateFavorite = function(index) {
@@ -71,14 +71,14 @@ angular.module('app.controllers', [])
 		setFavorite($scope.playingClipIndex);
 	};
 
-	$scope.updateThumbFromNative = function() {
-		if(!clipList[$scope.playingClipIndex].thumb) {
+	$scope.updateThumbFromNative = function(load) {
+		if(load === 'download' || !clipList[$scope.playingClipIndex].thumb) {
 			DBService.updateThumb(clipList[$scope.playingClipIndex]._id, clipList);			
 		}
 	};
 
-	$scope.updateBothFromNative = function() {
-		if(!clipList[$scope.playingClipIndex].thumb) {
+	$scope.updateBothFromNative = function(load) {
+		if(load === 'download' || !clipList[$scope.playingClipIndex].thumb) {
 			DBService.updateBoth(clipList[$scope.playingClipIndex]._id, !clipList[$scope.playingClipIndex].favorite, clipList);	
 		}else {
 			setFavorite($scope.playingClipIndex);
@@ -91,7 +91,7 @@ angular.module('app.controllers', [])
 	}
 })
 
-.controller('FavorateCtrl', function($scope, $state, $ionicListDelegate, $ionicPopover, ErrorService, DBService, AnimationService) {
+.controller('FavorateCtrl', function($scope, $state, $ionicListDelegate, $ionicPopover, ErrorService, DBService, NativeService) {
 	
  	$scope.listCanSwipe = true;
 	$scope.clips = DBService.list().getFavoriteList();	
@@ -144,7 +144,7 @@ angular.module('app.controllers', [])
 			$scope.clips = DBService.list().getFavoriteList();
 			$scope.noMoreItemsAvailable = DBService.pagination().favorite().hasNoMore();
 		}).catch(function (err) {              
-    	ErrorService.showAlert('Trouble in getting data');
+    	ErrorService.showAlert('获取数据失败');
 		}).finally(function() {
     	$scope.$broadcast('scroll.infiniteScrollComplete');
   	});    
@@ -152,7 +152,7 @@ angular.module('app.controllers', [])
 	
 	$scope.play = function(index) {		
 		$scope.playingClipIndex = index;
-		AnimationService.playAnimation($scope.clips[index].image, $scope.clips[index].favorite, false);
+		NativeService.playAnimation($scope.clips[index].image, $scope.clips[index].favorite, false);
 	};
 
 	$scope.removeFavorite = function(index) {	
@@ -163,8 +163,8 @@ angular.module('app.controllers', [])
 		}		
 	};
 	
-	$scope.updateThumbFromNative = function() {		
-		if(!$scope.clips[$scope.playingClipIndex].thumb) {
+	$scope.updateThumbFromNative = function(load) {	
+		if(load === 'download' || !$scope.clips[$scope.playingClipIndex].thumb) {		
 			DBService.updateThumb($scope.clips[$scope.playingClipIndex]._id, null);	
 		}
 	};
@@ -174,7 +174,7 @@ angular.module('app.controllers', [])
 	}
 })
 
-.controller('PlayersCtrl', function($scope, $state, DBService) {
+.controller('PlayersCtrl', function($scope, $state, DBService, ErrorService) {
 	
 	$scope.players = DBService.list().getPlayerList();
 
@@ -187,15 +187,15 @@ angular.module('app.controllers', [])
 				DBService.list().getAllPlayers().then(function() {
 					$scope.players = DBService.list().getPlayerList();
 				}).catch(function (err) {              
-	    		ErrorService.showAlert('Trouble in getting data');
+	    		ErrorService.showAlert('获取数据失败');
 	  		}).finally(function() {
       		$scope.$broadcast('scroll.refreshComplete');
       	});
 			} else {
-			$scope.$broadcast('scroll.refreshComplete');
-		}
+				$scope.$broadcast('scroll.refreshComplete');
+			}
 		}).catch(function (err){
-			ErrorService.showAlert('Trouble in getting data');
+			ErrorService.showAlert('同步数据失败', '请检查网络后重试');
 			$scope.$broadcast('scroll.refreshComplete');
 		});		
 	};	
@@ -229,7 +229,7 @@ angular.module('app.controllers', [])
 
 /*
 
-.controller('NewsCtrl', function($scope, $state, $stateParams, $ionicListDelegate, FileCacheService, DBService, ErrorService, AnimationService) {
+.controller('NewsCtrl', function($scope, $state, $stateParams, $ionicListDelegate, FileCacheService, DBService, ErrorService, NativeService) {
 	
 	var clipList = [];
 	$scope.clips = clipList;
@@ -282,7 +282,7 @@ angular.module('app.controllers', [])
 
 	$scope.play = function(index) {	
 		$scope.playingClipIndex = index;
-		AnimationService.playAnimation(clipList[index].image, clipList[index].favorite, true);
+		NativeService.playAnimation(clipList[index].image, clipList[index].favorite, true);
 	};
 
 	$scope.updateFavorite = function(index) {
@@ -356,7 +356,7 @@ $scope.doRefresh = function() {
   		});
 	};
 
-.controller('Tab2ClipsCtrl', function($scope, $state, $stateParams, $ionicListDelegate, FileCacheService, DBService, ErrorService, AnimationService, clips) {
+.controller('Tab2ClipsCtrl', function($scope, $state, $stateParams, $ionicListDelegate, FileCacheService, DBService, ErrorService, NativeService, clips) {
 	
 	$scope.listCanSwipe = true;
 	
@@ -420,7 +420,7 @@ $scope.doRefresh = function() {
 	};
 	
 	$scope.play = function(clipURL) {
-		AnimationService.playAnimation(clipURL);
+		NativeService.playAnimation(clipURL);
 	};
 	
 	$scope.test = function() {
@@ -480,7 +480,7 @@ $scope.doRefresh = function() {
 })
 
 
-.controller('ClipsCtrl', function($scope, $state, $stateParams, $ionicListDelegate, FileCacheService, DBService, ErrorService, AnimationService, clips, ClipService) {
+.controller('ClipsCtrl', function($scope, $state, $stateParams, $ionicListDelegate, FileCacheService, DBService, ErrorService, NativeService, clips, ClipService) {
 	
 	$scope.listCanSwipe = true;
 	
@@ -550,7 +550,7 @@ $scope.doRefresh = function() {
 	
 	$scope.play = function(clipURL, clipID) {
 		$scope.playingClipID = clipID;
-		AnimationService.playAnimation(clipURL);
+		NativeService.playAnimation(clipURL);
 	};
 	
 	$scope.setFavorite = function(clipID) {

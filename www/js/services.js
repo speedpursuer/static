@@ -17,7 +17,10 @@ angular.module('app.services', [])
         dbName: "ballroad_test",
         remoteURL: "http://121.40.197.226:4984/",
         dbAdapter: "websql",
-        network_err: "您的网络较慢，请稍后尝试同步"
+        network_err: {
+            title: "获取最新数据失败",
+            desc: "请检查网络后重试"
+        }
     }
     
     var db = pouchdb.create(string.dbName, {adapter: string.dbAdapter});
@@ -525,7 +528,7 @@ angular.module('app.services', [])
                 .then(retrieveAllMoves)
                 .then(function() {
                     deferred.resolve("DB Existed");
-                    ErrorService.showAlert(string.network_err);
+                    ErrorService.showAlert(string.network_err.title, string.network_err.desc);
                 }).catch(function(err){                    
                     initFail();
                     deferred.reject("Err in getting init data: " + err);                     
@@ -559,13 +562,21 @@ angular.module('app.services', [])
         dataFetcher.getMovesByPlayer(playerID).then(function(result){
             var moveID = result[0]._id;
             pagination.clips().init(playerID, moveID).then(function(result) {
-                deferred.resolve("Index verified");
-            }).catch(function() {
+                var search = {
+                    player: playerID,
+                    move: moveID
+                };
+                pagination.favorite().init(search).then(function(result) {
+                    deferred.resolve("Index verified");
+                }).catch(function(err) {
+                    deferred.reject(err);
+                });                        
+            }).catch(function(err) {
                 deferred.reject(err);
-            })
-        }).catch(function() {
+            });
+        }).catch(function(err) {
             deferred.reject(err);
-        })
+        });
         return deferred.promise;        
     }
 
@@ -795,7 +806,7 @@ angular.module('app.services', [])
     return service;
 })
 
-.factory('AnimationService', function() {
+.factory('NativeService', function() {
     
     var service = {}
     
@@ -811,11 +822,15 @@ angular.module('app.services', [])
         showFavBut = showFavBut? "true": "false";
         cordova.exec(win, fail, "MyHybridPlugin", "playClip", [clipURL, favorite, showFavBut]);
     };
+
+    service.showMessage = function(title, desc) {
+        cordova.exec(win, fail, "MyHybridPlugin", "showMessage", [title, desc]);  
+    }
     
     return service;
 })
 
-.factory('ErrorService', function($rootScope, $ionicModal, $cordovaSplashscreen, $ionicPopup, $ionicLoading, $timeout) {
+.factory('ErrorService', function($rootScope, $ionicModal, $cordovaSplashscreen, $ionicPopup, $ionicLoading, $timeout, NativeService) {
                 
          
     var service = {};
@@ -839,13 +854,16 @@ angular.module('app.services', [])
         }, 500);   
     };
 
-    service.showAlert = function(title) {
-        var alertPopup = $ionicPopup.alert({
-            title: title
-        });
+    service.showAlert = function(title, desc) {
+        
+        NativeService.showMessage(title, desc? desc: "请重试");
 
-        alertPopup.then(function(res) {
-        });
+        // var alertPopup = $ionicPopup.alert({
+        //     title: title
+        // });
+
+        // alertPopup.then(function(res) {
+        // });                
     };
 
     service.showDownLoader = function() {

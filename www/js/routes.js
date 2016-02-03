@@ -2,7 +2,7 @@ angular.module('app.routes', [])
 
 .config(function($stateProvider, $urlRouterProvider) {
 
-  $urlRouterProvider.otherwise('/tab/players');
+  $urlRouterProvider.otherwise('/tab/favorite');
 
   $stateProvider
 

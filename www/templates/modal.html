@@ -2,7 +2,14 @@
 	<ion-header-bar>
     <h1 class="title">提醒</h1>
    </ion-header-bar>
-   <ion-content>
-   	<p style="text-align: center;">您的网络较慢，安装出现困难，请检查后退出重试！</p>
+   <ion-content>   	
+		<div class="card">
+		  <div class="item item-text-wrap">
+		    <h3 style="text-align: center;">安装遇到问题，请确认接入网络后重试！</h3>
+		   	<button class="button button-assertive" style="margin-top: 1em; width: 100%;" ng-click="retry()">
+					重试
+				</button>
+		  </div>
+		</div>
    </ion-content>
 </ion-modal-view>

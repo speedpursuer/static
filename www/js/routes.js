@@ -2,15 +2,19 @@ angular.module('app.routes', [])
 
 .config(function($stateProvider, $urlRouterProvider) {
 
-  $urlRouterProvider.otherwise('/tab/favorite');
+  $urlRouterProvider.otherwise('/root');
 
   $stateProvider
+
+    .state('root', {
+      url: '/root',      
+      controller: 'RootCtrl',      
+    })
 
     .state('tabsController', {
       url: '/tab',
       abstract:true,
-      templateUrl: 'templates/tabsController.html',
-      controller: 'TabCtrl',
+      templateUrl: 'templates/tabsController.html',      
       resolve: {
         init: function(DBService) {
           return DBService.init();

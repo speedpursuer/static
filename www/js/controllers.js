@@ -1,16 +1,42 @@
 angular.module('app.controllers', [])
 
-.controller('TabCtrl', function($state, $timeout) {
+.controller('RootCtrl', function($scope, $rootScope, $state, $timeout, $ionicModal, ErrorService) {
+	
+	(function() {
+		init();		
+	}());	  
 
-	$timeout(function() {
-  	$state.go("tabsController.players").then(function(result) {
-			$timeout(function() {
-				$state.go("tabsController.stars");
-			}, 100);		
-		});	
-  }, 100);
+	$scope.retry = function() {  	
+		ErrorService.showSplashScreen();		
+  	cacheViews();
+  };
 
-})	
+  function init() {
+		$ionicModal.fromTemplateUrl('templates/modal.html', {
+	 		scope: $scope,
+	    animation: 'slide-in-up',
+	    backdropClickToClose: false,
+	    hardwareBackButtonClose: false
+	  }).then(function(modal) {
+	    $rootScope.modal = modal;
+	    cacheViews();
+	  });	
+	}
+
+  function cacheViews() {
+  	$timeout(function() {
+	  	$state.go("tabsController.favorite").then(function(result) {
+	  		$timeout(function() {
+			  	$state.go("tabsController.players").then(function(result) {
+						$timeout(function() {
+							$state.go("tabsController.stars");
+						}, 100);		
+					});
+				}, 100);		
+			});
+	  }, 100);	
+  }
+})
 
 .controller('StarsCtrl', function($scope, $ionicSlideBoxDelegate, $state, ErrorService, stars) {
   	
@@ -22,7 +48,8 @@ angular.module('app.controllers', [])
  		$scope.stars = results.docs;
 		$ionicSlideBoxDelegate.update();
 		$ionicSlideBoxDelegate.slide(0);					
-		ErrorService.hideSplashScreen();			
+		ErrorService.hideSplashScreen();
+		ErrorService.hideModal();
  	}
 
  	$scope.showMoves = function(playerID, playerName) {
@@ -115,7 +142,7 @@ angular.module('app.controllers', [])
   }).then(function(popover) {
     $scope.popover = popover;
   });
-
+  
   $scope.openPopover = function($event) {
   	$scope.search.by_player = $scope.search.selected_player;
   	$scope.search.by_move = $scope.search.selected_move;
@@ -123,6 +150,8 @@ angular.module('app.controllers', [])
   };
 
   $scope.filter = function() {
+
+  	ErrorService.showLoader();
 
   	var search = {
   		player: $scope.search.by_player,
@@ -135,6 +164,7 @@ angular.module('app.controllers', [])
   	DBService.pagination().favorite().init(search).then(function() {					
 			$scope.clips = DBService.list().getFavoriteList();
 			$scope.noMoreItemsAvailable = DBService.pagination().favorite().hasNoMore();
+			ErrorService.hideLoader();
 		})
     $scope.popover.hide();
   };
@@ -177,8 +207,6 @@ angular.module('app.controllers', [])
 .controller('PlayersCtrl', function($scope, $state, DBService, ErrorService) {
 	
 	$scope.players = DBService.list().getPlayerList();
-
-	//DBService.remoteDB().change();
 	
 	$scope.doRefresh = function() {
 		DBService.remoteDB().syncRemote()
@@ -228,6 +256,17 @@ angular.module('app.controllers', [])
 })
 
 /*
+.controller('TabCtrl', function($state, $timeout) {
+
+	// $timeout(function() {
+ //  	$state.go("tabsController.players").then(function(result) {
+	// 		$timeout(function() {
+	// 			$state.go("tabsController.stars");
+	// 		}, 100);		
+	// 	});	
+ //  }, 100);
+
+})	
 
 .controller('NewsCtrl', function($scope, $state, $stateParams, $ionicListDelegate, FileCacheService, DBService, ErrorService, NativeService) {
 	

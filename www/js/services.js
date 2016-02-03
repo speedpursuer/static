@@ -92,8 +92,6 @@ angular.module('app.services', [])
             getDoc(clipID).then(function(result){
                 result.thumb = thumb;
                 result.favorite = true;                
-                result.player = result.player? result.player: "";
-                result.move = result.move? result.move: "";
                 that.favoriteList.unshift(result);
             });     
         },
@@ -328,8 +326,8 @@ angular.module('app.services', [])
                                 thumb: row.value.thumb,
                                 favorite: row.key[0],
                                 local: row.id,
-                                player: row.doc.player? row.doc.player: "",
-                                move: row.doc.move? row.doc.move: "",
+                                player: row.doc.player,
+                                move: row.doc.move,
                                 timestamp: row.value.timestamp
                             };
                         });
@@ -368,10 +366,6 @@ angular.module('app.services', [])
         }   
     };
 
-    // service.syncRemote = function() {
-    //     return syncFromRemote();
-    // };
-
     service.put = function(doc) {
         return db.put(doc);
     };
@@ -407,8 +401,8 @@ angular.module('app.services', [])
                     favorite: favorite,
                     thumb: clip.image + post_fix,
                     clip: clipID,
-                    player: clip.player? clip.player: "",
-                    move: clip.move? clip.move: "",
+                    player: clip.player,
+                    move: clip.move,
                     timestamp: "" + date.getTime()            
                 }
                 db.put(local);
@@ -460,8 +454,8 @@ angular.module('app.services', [])
                     favorite: flag,
                     thumb: "",
                     clip: clipID,
-                    player: clip.player? clip.player: "",
-                    move: clip.move? clip.move: "",
+                    player: clip.player,
+                    move: clip.move,
                     timestamp: "" + date.getTime()
                 }
                 db.put(local);
@@ -497,7 +491,9 @@ angular.module('app.services', [])
                     type: "local",
                     favorite: false,
                     thumb: clip.image + post_fix,
-                    clip: clipID            
+                    clip: clipID,
+                    player: clip.player,
+                    move: clip.move            
                 }
                 db.put(local);
             });         
@@ -835,17 +831,30 @@ angular.module('app.services', [])
          
     var service = {};
                 
-    $ionicModal.fromTemplateUrl('templates/modal.html', {
-        scope: $rootScope,
-        animation: 'slide-in-up',
-        backdropClickToClose: false,
-        hardwareBackButtonClose: false
-    }).then(function(modal) {
-        $rootScope.modal = modal;
-    });
+    // $ionicModal.fromTemplateUrl('templates/modal.html', {
+    //     scope: $rootScope,
+    //     animation: 'slide-in-up',
+    //     backdropClickToClose: false,
+    //     hardwareBackButtonClose: false
+    // }).then(function(modal) {
+    //     $rootScope.modal = modal;
+    // });
 
     service.showModal = function() {
-        $rootScope.modal.show();
+        if(!$rootScope.modal.isShown()){
+            $rootScope.modal.show();    
+        }        
+    };
+
+    service.hideModal = function() {
+        if($rootScope.modal.isShown()) {
+            $rootScope.modal.hide();
+            //$rootScope.modal.remove();    
+        }
+    };
+
+    service.showSplashScreen = function() {
+        $cordovaSplashscreen.show();
     };
 
     service.hideSplashScreen = function() {
@@ -873,9 +882,9 @@ angular.module('app.services', [])
         });
     };
     
-    service.showLoader = function(title) {
+    service.showLoader = function() {
         $ionicLoading.show({
-            template: title,
+            template: '<ion-spinner icon="crescent"></ion-spinner>',
             hideOnStateChange: true
         });
     };
@@ -891,6 +900,9 @@ angular.module('app.services', [])
 })
 
 /*
+  // service.syncRemote = function() {
+    //     return syncFromRemote();
+    // };
 
 getClipsByPlayer: function(playerID, moveName) {
 

@@ -9,6 +9,7 @@ angular.module('app.routes', [])
     .state('root', {
       url: '/root',      
       controller: 'RootCtrl',      
+      templateUrl: 'templates/root.html'
     })
 
     .state('tabsController', {

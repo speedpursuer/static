@@ -33,6 +33,11 @@ function updateClip(favorite, load, from) {
     }
 }
 
+function retryInstall() {
+    var scope = angular.element(document.getElementById('RootScopeID')).scope();
+    scope.retry();
+}
+
 /*
 function test_test(favorite, load, from) {
     alert("favorite: " + favorite + "; load = " + load + "; from = " + from);

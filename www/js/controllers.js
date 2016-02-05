@@ -3,25 +3,12 @@ angular.module('app.controllers', [])
 .controller('RootCtrl', function($scope, $rootScope, $state, $timeout, $ionicModal, ErrorService) {
 	
 	(function() {
-		init();		
+		cacheViews();
 	}());	  
 
-	$scope.retry = function() {  	
-		ErrorService.showSplashScreen();		
-  	cacheViews();
+	$scope.retry = function() {
+  	cacheViews();  	
   };
-
-  function init() {
-		$ionicModal.fromTemplateUrl('templates/modal.html', {
-	 		scope: $scope,
-	    animation: 'slide-in-up',
-	    backdropClickToClose: false,
-	    hardwareBackButtonClose: false
-	  }).then(function(modal) {
-	    $rootScope.modal = modal;
-	    cacheViews();
-	  });	
-	}
 
   function cacheViews() {
   	$timeout(function() {
@@ -49,7 +36,6 @@ angular.module('app.controllers', [])
 		$ionicSlideBoxDelegate.update();
 		$ionicSlideBoxDelegate.slide(0);					
 		ErrorService.hideSplashScreen();
-		ErrorService.hideModal();
  	}
 
  	$scope.showMoves = function(playerID, playerName) {
@@ -78,7 +64,7 @@ angular.module('app.controllers', [])
 			setClipList(clipList.concat(clips));
 			$scope.noMoreItemsAvailable = DBService.pagination().clips().hasNoMore();
 		}).catch(function (err) {              
-    	ErrorService.showAlert('获取数据失败');
+    	ErrorService.showAlert('无法获取数据');
 		}).finally(function() {
     	$scope.$broadcast('scroll.infiniteScrollComplete');
   	});    
@@ -174,7 +160,7 @@ angular.module('app.controllers', [])
 			$scope.clips = DBService.list().getFavoriteList();
 			$scope.noMoreItemsAvailable = DBService.pagination().favorite().hasNoMore();
 		}).catch(function (err) {              
-    	ErrorService.showAlert('获取数据失败');
+    	ErrorService.showAlert('无法获取数据');
 		}).finally(function() {
     	$scope.$broadcast('scroll.infiniteScrollComplete');
   	});    
@@ -215,7 +201,7 @@ angular.module('app.controllers', [])
 				DBService.list().getAllPlayers().then(function() {
 					$scope.players = DBService.list().getPlayerList();
 				}).catch(function (err) {              
-	    		ErrorService.showAlert('获取数据失败');
+	    		ErrorService.showAlert('无法获取数据');
 	  		}).finally(function() {
       		$scope.$broadcast('scroll.refreshComplete');
       	});
@@ -223,7 +209,7 @@ angular.module('app.controllers', [])
 				$scope.$broadcast('scroll.refreshComplete');
 			}
 		}).catch(function (err){
-			ErrorService.showAlert('同步数据失败', '请检查网络后重试');
+			ErrorService.showAlert('无法同步数据', '没有可使用的互联网连接。');
 			$scope.$broadcast('scroll.refreshComplete');
 		});		
 	};	

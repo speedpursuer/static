@@ -18,8 +18,8 @@ angular.module('app.services', [])
         remoteURL: "http://121.40.197.226:4984/",
         dbAdapter: "websql",
         network_err: {
-            title: "获取最新数据失败",
-            desc: "请检查网络后重试"
+            title: "无法获取最新数据",
+            desc: "没有可使用的互联网连接。"
         }
     }
     
@@ -577,8 +577,7 @@ angular.module('app.services', [])
     }
 
     function initFail() {
-        ErrorService.showModal();
-        ErrorService.hideSplashScreen();        
+        ErrorService.showAlert("无法完成安装", "没有可使用的互联网连接。", true);         
     }
 
     function initFavorite() {
@@ -819,8 +818,12 @@ angular.module('app.services', [])
         cordova.exec(win, fail, "MyHybridPlugin", "playClip", [clipURL, favorite, showFavBut]);
     };
 
-    service.showMessage = function(title, desc) {
-        cordova.exec(win, fail, "MyHybridPlugin", "showMessage", [title, desc]);  
+    service.showMessage = function(title, desc, retry) {        
+        var _retry = "false";
+        if(retry) {
+            _retry = "true";
+        }        
+        cordova.exec(win, fail, "MyHybridPlugin", "showMessage", [title, desc, _retry]);
     }
     
     return service;
@@ -831,14 +834,14 @@ angular.module('app.services', [])
          
     var service = {};
                 
-    // $ionicModal.fromTemplateUrl('templates/modal.html', {
-    //     scope: $rootScope,
-    //     animation: 'slide-in-up',
-    //     backdropClickToClose: false,
-    //     hardwareBackButtonClose: false
-    // }).then(function(modal) {
-    //     $rootScope.modal = modal;
-    // });
+    $ionicModal.fromTemplateUrl('templates/modal.html', {
+        scope: $rootScope,
+        animation: 'slide-in-up',
+        backdropClickToClose: false,
+        hardwareBackButtonClose: false
+    }).then(function(modal) {
+        $rootScope.modal = modal;
+    });
 
     service.showModal = function() {
         if(!$rootScope.modal.isShown()){
@@ -849,7 +852,7 @@ angular.module('app.services', [])
     service.hideModal = function() {
         if($rootScope.modal.isShown()) {
             $rootScope.modal.hide();
-            //$rootScope.modal.remove();    
+            $rootScope.modal.remove();    
         }
     };
 
@@ -863,10 +866,9 @@ angular.module('app.services', [])
         }, 500);   
     };
 
-    service.showAlert = function(title, desc) {
+    service.showAlert = function(title, desc, retry) {
         
-        NativeService.showMessage(title, desc? desc: "请重试");
-
+        NativeService.showMessage(title, desc? desc: "请稍后重试", retry);
         // var alertPopup = $ionicPopup.alert({
         //     title: title
         // });
@@ -884,7 +886,7 @@ angular.module('app.services', [])
     
     service.showLoader = function() {
         $ionicLoading.show({
-            template: '<ion-spinner icon="crescent"></ion-spinner>',
+            template: '<ion-spinner icon="crescent" class="spinner-assertive"></ion-spinner>',
             hideOnStateChange: true
         });
     };

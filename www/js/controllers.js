@@ -2,7 +2,7 @@ angular.module('app.controllers', [])
 
 .controller('RootCtrl', function($scope, $rootScope, $state, $timeout, $ionicModal, ErrorService) {
 	
-	(function() {
+	(function() {		
 		cacheViews();
 	}());	  
 
@@ -43,36 +43,25 @@ angular.module('app.controllers', [])
 	};	
 })
    
-.controller('ClipsCtrl', function($scope, $state, $stateParams, $ionicListDelegate, FileCacheService, DBService, ErrorService, NativeService, clips) {
+.controller('ClipsCtrl', function($scope, $state, $stateParams, $ionicListDelegate, FileCacheService, DBService, ErrorService, NativeService) {
 	
-	var clipList = clips;
-
+	$scope.paginator = DBService.pagination().clips().getPaginator();
+	$scope.clips = $scope.paginator.currentList;
+	//$scope.noMoreItemsAvailable = DBService.pagination().clips().hasNoMore();	
 	$scope.listCanSwipe = true;	
-	$scope.clips = clipList;
 	$scope.playerName = $stateParams.playerName;
 	$scope.moveName = $stateParams.moveName;	
-	$scope.playingClipIndex = "";	
-	$scope.noMoreItemsAvailable = DBService.pagination().clips().hasNoMore();
-
-	function setClipList(list) {
-		$scope.clips = list;
-		clipList = list;
-	}
-
+	$scope.playingClipIndex = "";
+	
 	$scope.loadMore = function() {
-  	DBService.pagination().clips().more().then(function(clips) {			
-			setClipList(clipList.concat(clips));
-			$scope.noMoreItemsAvailable = DBService.pagination().clips().hasNoMore();
-		}).catch(function (err) {              
-    	ErrorService.showAlert('无法获取数据');
-		}).finally(function() {
-    	$scope.$broadcast('scroll.infiniteScrollComplete');
-  	});    
+		DBService.pagination().clips().more(function(){
+			$scope.$broadcast('scroll.infiniteScrollComplete');
+		});
   };
 
-	$scope.play = function(index) {	
+	$scope.play = function(index) {		
 		$scope.playingClipIndex = index;
-		NativeService.playAnimation(clipList[index].image, clipList[index].favorite, true);
+		NativeService.playAnimation($scope.clips[index].image, $scope.clips[index].favorite, true);
 	};
 
 	$scope.updateFavorite = function(index) {
@@ -85,22 +74,22 @@ angular.module('app.controllers', [])
 	};
 
 	$scope.updateThumbFromNative = function(load) {
-		if(load === 'download' || !clipList[$scope.playingClipIndex].thumb) {
-			DBService.updateThumb(clipList[$scope.playingClipIndex]._id, clipList);			
+		if(load === 'download' || !$scope.clips[$scope.playingClipIndex].thumb) {
+			DBService.updateThumb($scope.clips[$scope.playingClipIndex]._id, $scope.clips);			
 		}
 	};
 
 	$scope.updateBothFromNative = function(load) {
-		if(load === 'download' || !clipList[$scope.playingClipIndex].thumb) {
-			DBService.updateBoth(clipList[$scope.playingClipIndex]._id, !clipList[$scope.playingClipIndex].favorite, clipList);	
+		if(load === 'download' || !$scope.clips[$scope.playingClipIndex].thumb) {
+			DBService.updateBoth($scope.clips[$scope.playingClipIndex]._id, !$scope.clips[$scope.playingClipIndex].favorite, $scope.clips);	
 		}else {
 			setFavorite($scope.playingClipIndex);
 		}		
 	};
 
 	function setFavorite(index) {
-		DBService.updateFavorite(clipList[index]._id, clipList[index].local, !clipList[index].favorite);
-		clipList[index].favorite = !clipList[index].favorite;
+		DBService.updateFavorite($scope.clips[index]._id, $scope.clips[index].local, !$scope.clips[index].favorite);
+		$scope.clips[index].favorite = !$scope.clips[index].favorite;
 	}
 })
 
@@ -194,24 +183,10 @@ angular.module('app.controllers', [])
 	
 	$scope.players = DBService.list().getPlayerList();
 	
-	$scope.doRefresh = function() {
-		DBService.remoteDB().syncRemote()
-		.then(function(result) {
-			if(result.docs_written > 0) {
-				DBService.list().getAllPlayers().then(function() {
-					$scope.players = DBService.list().getPlayerList();
-				}).catch(function (err) {              
-	    		ErrorService.showAlert('无法获取数据');
-	  		}).finally(function() {
-      		$scope.$broadcast('scroll.refreshComplete');
-      	});
-			} else {
-				$scope.$broadcast('scroll.refreshComplete');
-			}
-		}).catch(function (err){
-			ErrorService.showAlert('无法同步数据', '没有可使用的互联网连接。');
+	$scope.doRefresh = function() {		
+		DBService.remoteDB().syncRemote(function() {
 			$scope.$broadcast('scroll.refreshComplete');
-		});		
+		});
 	};	
 		
 	$scope.showMoves = function(playerID, playerName) {
@@ -242,6 +217,28 @@ angular.module('app.controllers', [])
 })
 
 /*
+ // 	DBService.pagination().clips().more().then(function(clips) {			
+		// 	//setClipList(clipList.concat(clips));
+		// 	//$scope.noMoreItemsAvailable = DBService.pagination().clips().hasNoMore();
+
+		// 	clipList.push.apply(clipList, clips);
+		// 	//$scope.noMoreItemsAvailable = DBService.pagination().clips().hasNoMore();
+
+		// }).catch(function (err) {              
+  //   	ErrorService.showAlert('无法获取数据');
+		// }).finally(function() {
+  //   	$scope.$broadcast('scroll.infiniteScrollComplete');
+  // 	});    
+
+// function setClipList(list) {
+	// 	$scope.clips = list;
+	// 	clipList = list;
+	// }
+
+//var clipList = clips;
+
+	//var clipList = DBService.pagination().clips().getCurrentList();
+
 .controller('TabCtrl', function($state, $timeout) {
 
 	// $timeout(function() {

@@ -46,4 +46,8 @@ angular.module('app', ['ionic', 'app.controllers', 'app.routes', 'app.services',
     window.addEventListener("orientationchange", function(){
       console.log('Orientation changed to ' + screen.orientation);
     });*/
+
+    function abc() {
+      
+    }
 })

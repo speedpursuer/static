@@ -3,19 +3,20 @@ angular.module('app.services', [])
 
 .factory('DBService', function($q, pouchdb, ErrorService) {
 
-    //var dbName = "ballroad_test", remoteURL = "http://admin:12341234@localhost:5984/";
-    //var dbName = "ballroad", remoteURL = "http://admin:12341234@localhost:5984/";
-    //var db = pouchdb.create(dbName);//, remoteDB = pouchdb.create(remoteURL + dbName);
-    //deleteDB();
-    //syncTo();        
-    //setupView();    
-    //testFun();
+    (function() {
+        //deleteDB();
+        //syncTo();        
+        //setupView();    
+        //testFun();
+    }());
 
     var service = {};
 
     var string = {
         dbName: "ballroad_test",
         remoteURL: "http://121.40.197.226:4984/",
+        // dbName: "app_test",
+        // remoteURL: "http://admin:12341234@localhost:5984/",
         dbAdapter: "websql",
         network_err: {
             title: "无法获取最新数据",
@@ -25,7 +26,9 @@ angular.module('app.services', [])
     
     var db = pouchdb.create(string.dbName, {adapter: string.dbAdapter});
 
-    //deleteDB();
+    service.test = function() {
+        console.log("test from DBService");
+    };  
 
     service.list = function() {
         return list;
@@ -48,17 +51,30 @@ angular.module('app.services', [])
         favoriteList: [],
         playerList: [],
         moveList: [],
+        clipList: [],
 
         setMoveList: function(_list) {                                               
-            this.moveList = _list;       
+            if(this.moveList.length > 0) {
+                this.moveList.length = 0;
+                //this.moveList.push.apply(this.moveList, _list);
+                copyList(this.moveList, _list);
+            }else {
+                this.moveList = _list; 
+            }      
         },
 
         getMoveList: function() {
             return this.moveList;
         },
         
-        setPlayerList: function(_list) {                                               
-            this.playerList = _list;       
+        setPlayerList: function(_list) {                                          
+            if(this.playerList.length > 0) {
+                this.playerList.length = 0;
+                //this.playerList.push.apply(this.playerList, _list);
+                copyList(this.playerList, _list);
+            }else {
+                this.playerList = _list; 
+            }
         },
 
         getPlayerList: function() {
@@ -171,21 +187,36 @@ angular.module('app.services', [])
 
         clipsPg: {
             options: {},
-            end: false,
+            //end: {noMore: false},
             limit: 6,    
             descending: true,
+            paginator: {
+                currentList: list.clipList,
+                noMore: false
+            },
             init: function(playerID, moveID) {
                 this.options = {descending : this.descending, limit : this.limit, endkey: [playerID, moveID], startkey: [playerID, moveID, {}], reduce: true, group: true};
-                this.end = false;
+                this.paginator.noMore = false;
+                this.paginator.currentList.length = 0;
                 return this.getClips();
             },
             
-            more: function() {
-                return this.getClips();  
+            more: function(callback) {            
+                this.getClips()
+                .catch(function(){
+                    ErrorService.showAlert('无法获取数据');
+                }).finally(function(){
+                    if(callback) callback();
+                });
+                //return this.getClips();
             },
             
-            hasNoMore: function() {
-                return this.end;
+            // hasNoMore: function() {
+            //     return this.paginator;
+            // },
+
+            getPaginator: function() {
+                return this.paginator;
             },
             
             getClips: function() {
@@ -201,7 +232,7 @@ angular.module('app.services', [])
                     if (result && result.rows.length > 0) {
 
                         if(result.rows.length < that.limit) {
-                            that.end = true;
+                            that.paginator.noMore = true;
                         }
                         
                         _options.startkey = result.rows[result.rows.length - 1].key;
@@ -232,13 +263,15 @@ angular.module('app.services', [])
                                 };
                             });
                             
-                            deferred.resolve(result);             
-
+                            //that.paginator.currentList.push.apply(that.paginator.currentList, result);                            
+                            // deferred.resolve(result);
+                            copyList(that.paginator.currentList, result);
+                            deferred.resolve("More data fetched");
                         }).catch(function (err) {                
                             deferred.reject(err);                
                         });
                     }else{
-                        that.end = true;                
+                        that.paginator.noMore = true;                
                         deferred.resolve("No more data");             
                     }
                 }).catch(function (err) {
@@ -350,8 +383,17 @@ angular.module('app.services', [])
     };
 
     var remoteDB = {
-        syncRemote: function() {
-            return syncFromRemote();
+        syncRemote: function(callback) {
+            syncFromRemote().then(function(result) {
+                if(result.docs_written > 0) {
+                    retrieveAllPlayers();
+                    retrieveAllMoves();
+                }
+            }).catch(function(err) {
+                ErrorService.showAlert('无法同步数据', '没有可使用的互联网连接。');
+            }).finally(function(){
+                if(callback) callback();
+            });
         },    
 
         change: function() {
@@ -368,6 +410,77 @@ angular.module('app.services', [])
 
     service.put = function(doc) {
         return db.put(doc);
+    };
+
+    var clipUpdator = {
+        localClipID: "",
+        post_fix: ".jpg",
+        updateFavorite: function() {
+            
+        },
+
+        updateThumb: function() {
+
+        },
+
+        updateBoth: function() {
+            var post_fix = ".jpg";
+
+            var updateList = function(list) {
+                if(list && list.length > 0) {
+                    for(i in list) {
+                        if(list[i]._id == clipID) {                
+                            list[i].thumb = list[i].image + post_fix;
+                            list[i].favorite = favorite;
+                            return;
+                        }
+                    }        
+                }            
+            };
+
+            db.get(clipID).then(function(clip) {
+                db.get(clip.local).then(function(local) {
+                    var date = new Date();
+                    local.thumb = clip.image + post_fix;
+                    local.favorite = favorite;                
+                    local.timestamp = "" + date.getTime();
+                    db.put(local);
+                }).catch(function(){
+                    var date = new Date();
+                    var local = {
+                        _id: clip.local,
+                        type: "local",
+                        favorite: favorite,
+                        thumb: clip.image + post_fix,
+                        clip: clipID,
+                        player: clip.player,
+                        move: clip.move,
+                        timestamp: "" + date.getTime()            
+                    }
+                    db.put(local);
+                });  
+
+                if(favorite) {
+                    list.addFavoriteToList(clipID, clip.image + post_fix);
+                } else {
+                    list.removeFavoriteFromList(clipID);
+                }                                  
+            });
+
+            updateList(curClipList);    
+        },
+
+        updateClipList: function(list, flag1, flag2) {
+            if(list && list.length > 0) {
+                for(i in list) {
+                    if(list[i].local == localClipID) {                                            
+                        list[i].thumb = list[i].image + post_fix;
+                        list[i].favorite = favorite;
+                        return;
+                    }
+                }        
+            }  
+        }
     };
 
     service.updateBoth = function(clipID, favorite, curClipList) {
@@ -418,7 +531,7 @@ angular.module('app.services', [])
         updateList(curClipList);        
         //updateList(newsList);        
     };
-    
+
     service.updateFavorite = function(clipID, localID, flag) {    
 
         var updateList = function(list) {
@@ -510,8 +623,8 @@ angular.module('app.services', [])
         .then(function() {
             syncFromRemote().then(function(){                                   
                 retrieveAllPlayers()
-                .then(initFavorite)
                 .then(retrieveAllMoves)
+                .then(retrieveFavorites)
                 .then(function() {
                     deferred.resolve("DB Existed");
                 }).catch(function(err){                    
@@ -520,8 +633,8 @@ angular.module('app.services', [])
                 });
             }).catch(function(){                        
                 retrieveAllPlayers()
-                .then(initFavorite)
                 .then(retrieveAllMoves)
+                .then(retrieveFavorites)
                 .then(function() {
                     deferred.resolve("DB Existed");
                     ErrorService.showAlert(string.network_err.title, string.network_err.desc);
@@ -535,8 +648,8 @@ angular.module('app.services', [])
             .then(setupView)            
             .then(setUpIndex)                    
             .then(retrieveAllPlayers)
-            .then(initFavorite)
-            .then(retrieveAllMoves)            
+            .then(retrieveAllMoves)
+            .then(retrieveFavorites)            
             .then(verifyView)
             .then(markInstalled)    
             .then(function() {
@@ -580,16 +693,12 @@ angular.module('app.services', [])
         ErrorService.showAlert("无法完成安装", "没有可使用的互联网连接。", true);         
     }
 
-    function initFavorite() {
+    function retrieveFavorites() {
         return pagination.favorite().init();
     }
 
     function retrieveAllMoves() {
         return dataFetcher.getMoves();
-    }
-
-    function getDoc(id) {
-        return db.get(id);
     }
 
     function retrieveAllPlayers() {
@@ -630,6 +739,14 @@ angular.module('app.services', [])
         });
 
         return deferred.promise;
+    }
+
+    function copyList(desc, source) {
+        desc.push.apply(desc, source);
+    }
+
+    function getDoc(id) {
+        return db.get(id);
     }
 
     function deleteDB() {      

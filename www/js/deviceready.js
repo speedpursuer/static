@@ -12,6 +12,12 @@ angular.element(document).ready(function () {
     }
 });
 
+function test() {
+    //angular.injector(['ng', 'app.services']).get("DBService").test();
+    var handler = angular.element(document.getElementById('ClipsScopeID')).injector().get('DBService');
+    var list = handler.list().getPlayerList();
+}
+
 function updateClip(favorite, load, from) {
     
     if(from === "clip") {

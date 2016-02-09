@@ -125,7 +125,7 @@
               revsDiff: qify(db.revsDiff.bind(db)),
               replicate: {
                 to: db.replicate.to.bind(db),
-                from: db.replicate.from.bind(db),
+                from: qify(db.replicate.from.bind(db)),
                 sync: db.replicate.sync.bind(db)
               },
               destroy: qify(db.destroy.bind(db)),

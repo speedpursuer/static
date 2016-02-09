@@ -96,8 +96,8 @@ angular.module('app.controllers', [])
 .controller('FavorateCtrl', function($scope, $state, $ionicListDelegate, $ionicPopover, ErrorService, DBService, NativeService) {
 	
  	$scope.listCanSwipe = true;
+ 	$scope.playingClipIndex = "";
 	$scope.clips = DBService.list().getFavoriteList();	
-	$scope.playingClipIndex = "";
 	$scope.noMoreItemsAvailable = DBService.pagination().favorite().hasNoMore();
 
 	$scope.data = {  	
@@ -136,23 +136,31 @@ angular.module('app.controllers', [])
   	$scope.search.selected_player = $scope.search.by_player;
   	$scope.search.selected_move = $scope.search.by_move;
 
-  	DBService.pagination().favorite().init(search).then(function() {					
-			$scope.clips = DBService.list().getFavoriteList();
-			$scope.noMoreItemsAvailable = DBService.pagination().favorite().hasNoMore();
+  	DBService.pagination().favorite().search(search, function() {		
 			ErrorService.hideLoader();
-		})
+		});
+
+  	// DBService.pagination().favorite().init(search).then(function() {					
+		// 	$scope.clips = DBService.list().getFavoriteList();
+		// 	$scope.noMoreItemsAvailable = DBService.pagination().favorite().hasNoMore();
+		// 	ErrorService.hideLoader();
+		// });
+
     $scope.popover.hide();
   };
 
 	$scope.loadMore = function() {
-  	DBService.pagination().favorite().more().then(function() {					
-			$scope.clips = DBService.list().getFavoriteList();
-			$scope.noMoreItemsAvailable = DBService.pagination().favorite().hasNoMore();
-		}).catch(function (err) {              
-    	ErrorService.showAlert('无法获取数据');
-		}).finally(function() {
-    	$scope.$broadcast('scroll.infiniteScrollComplete');
-  	});    
+  // 	DBService.pagination().favorite().more().then(function() {					
+		// 	$scope.clips = DBService.list().getFavoriteList();
+		// 	$scope.noMoreItemsAvailable = DBService.pagination().favorite().hasNoMore();
+		// }).catch(function (err) {              
+  //   	ErrorService.showAlert('无法获取数据');
+		// }).finally(function() {
+  //   	$scope.$broadcast('scroll.infiniteScrollComplete');
+  // 	});    
+			DBService.pagination().favorite().more(function() {
+				$scope.$broadcast('scroll.infiniteScrollComplete');
+			});
   };
 	
 	$scope.play = function(index) {		

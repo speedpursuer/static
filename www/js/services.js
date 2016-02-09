@@ -82,15 +82,24 @@ angular.module('app.services', [])
         },
 
         setFavoriteList: function(_list) {     
-            if(this.favoriteList.length) {
-                this.favoriteList = this.favoriteList.concat(_list);
-            }else{
-                this.favoriteList = _list;           
-            }                   
+            // if(this.favoriteList.length) {
+            //     this.favoriteList = this.favoriteList.concat(_list);
+            // }else{
+            //     this.favoriteList = _list;           
+            // }
+
+            // if(this.favoriteList.length > 0) {
+            //     //this.favoriteList.length = 0;
+            //     //this.playerList.push.apply(this.playerList, _list);
+            //     copyList(this.favoriteList, _list);
+            // }else {
+            //     this.favoriteList = _list; 
+            // }                   
+            copyList(this.favoriteList, _list);
         },
 
         resetFavoriteList: function() {     
-            this.favoriteList = [];                 
+            this.favoriteList.length = 0;                 
         },
 
         getFavoriteList: function(){
@@ -284,11 +293,22 @@ angular.module('app.services', [])
 
         favoritePg: {
             options: {},
-            end: false,
+            end: {
+                noMore: false
+            },
             limit: 6,
             view: "",
             descending: true,
-            init: function(search) {
+            inProgress: false,
+            
+            init: function() {
+                this.view = "favorite";
+                this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true], startkey: [true, {}]};    
+                // this.end.noMore = false;
+                // list.resetFavoriteList();
+                return this.getFavorite();  
+            },
+            search: function(search, callback) {
 
                 if(!search) search = {};
 
@@ -309,12 +329,27 @@ angular.module('app.services', [])
                     this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true], startkey: [true, {}]};    
                 }
 
-                this.end = false;
+                this.end.noMore = false;
 
-                return this.getFavorite();
-            },
-            more: function() {
-                return this.getFavorite();  
+                this.more(callback);               
+                // this.getFavorite()
+                // .catch(function() {
+                //     ErrorService.showAlert('无法获取数据');
+                // }).finally(function() {
+                //     //this.inProgress = false;
+                //     if(callback) callback();
+                // });
+            },            
+            more: function(callback) {
+                //if(this.inProgress) return;
+                //this.inProgress = true;
+                this.getFavorite()
+                .catch(function() {
+                    ErrorService.showAlert('无法获取数据');
+                }).finally(function() {
+                    //this.inProgress = false;
+                    if(callback) callback();
+                });
             },
             hasNoMore: function() {
                 return this.end;
@@ -342,12 +377,12 @@ angular.module('app.services', [])
 
                     if (result && result.rows.length > 0) {
 
-                        if(result.rows.length < that.limit) {
-                            that.end = true;
-                        }
-                        
                         _options.startkey = result.rows[result.rows.length - 1].key;
                         _options.skip = 1;
+
+                        if(result.rows.length < that.limit) {
+                            that.end.noMore = true;
+                        }                                            
                                                        
                         result = result.rows.map(function(row) {
                         
@@ -370,7 +405,7 @@ angular.module('app.services', [])
 
                     }else{
                         deferred.resolve("No more data");                   
-                        that.end = true;
+                        that.end.noMore = true;
                     }
 
                 }).catch(function (err) {                

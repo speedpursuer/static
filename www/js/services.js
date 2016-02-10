@@ -294,7 +294,7 @@ angular.module('app.services', [])
         favoritePg: {
             options: {},
             end: {
-                noMore: false
+                noMore: true
             },
             limit: 6,
             view: "",
@@ -329,7 +329,7 @@ angular.module('app.services', [])
                     this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true], startkey: [true, {}]};    
                 }
 
-                this.end.noMore = false;
+                this.end.noMore = true;
 
                 this.more(callback);               
                 // this.getFavorite()
@@ -382,8 +382,10 @@ angular.module('app.services', [])
 
                         if(result.rows.length < that.limit) {
                             that.end.noMore = true;
-                        }                                            
-                                                       
+                        }else{
+                            that.end.noMore = false;
+                        }
+                                                                               
                         result = result.rows.map(function(row) {
                         
                             return {

@@ -3,14 +3,29 @@ angular.element(document).ready(function () {
         console.log("Running in Cordova, will bootstrap AngularJS once 'deviceready' event fires.");
         
         document.addEventListener('deviceready', function () {
-            console.log("Deviceready event has fired, bootstrapping AngularJS.");            
-            angular.bootstrap(document.body, ['app']);            
+            console.log("Deviceready event has fired, bootstrapping AngularJS.");
+            startForIOS();
         }, false);
     } else {
         console.log("Running in browser, bootstrapping AngularJS now.");        
         angular.bootstrap(document.body, ['app']);
     }
 });
+
+var dbString = "";
+
+function startForIOS() {
+    cordova.exec(
+        function(r){
+            dbString = r;
+            angular.bootstrap(document.body, ['app']);            
+        }, 
+        function(e){
+            console.log(e);
+        }, 
+        "MyHybridPlugin", "dbString"
+    );
+}
 
 function test() {
     //angular.injector(['ng', 'app.services']).get("DBService").test();

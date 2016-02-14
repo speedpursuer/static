@@ -124,7 +124,7 @@ angular.module('ImgCache', [])
 
             var loadImg = function(type, el, src) {
 
-                $(el).fadeIn();
+                //$(el).fadeIn();
                 
                 el.attr('src', "images/bg.jpg");
 
@@ -189,7 +189,7 @@ angular.module('ImgCache', [])
 
             var loadImg = function(type, el, src) {
 
-                $(el).fadeIn();
+                //$(el).fadeIn();
                 
                 el.attr('src', "images/bg.jpg");
 
@@ -255,7 +255,7 @@ angular.module('ImgCache', [])
 
             var loadImg = function(type, el, src) {
 
-                $(el).fadeIn();
+                //$(el).fadeIn();
                 
                 el.attr('src', "images/bg.jpg");
 

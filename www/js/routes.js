@@ -58,7 +58,8 @@ angular.module('app.routes', [])
       resolve: {
         clips: function($stateParams, DBService) {          
           //return DBService.getClipsByPlayer($stateParams.playerID, $stateParams.moveName);                    
-          return DBService.pagination().clips().init($stateParams.playerID, $stateParams.moveID);
+          //return DBService.pagination().clips().init($stateParams.playerID, $stateParams.moveID);
+          return DBService.pagination().favorite().init();
         }
       },
       views: {
@@ -106,6 +107,7 @@ angular.module('app.routes', [])
         clips: function($stateParams, DBService) {
           //return DBService.getClipsByPlayer($stateParams.playerID, $stateParams.moveName);                    
           return DBService.pagination().clips().init($stateParams.playerID, $stateParams.moveID);
+          //return DBService.pagination().favorite().init();
         }
       },
       views: {
@@ -118,6 +120,7 @@ angular.module('app.routes', [])
 
     .state('tabsController.favorite', {
       url: '/favorite',
+      cache: false,
       /*
       cache: false,      
       resolve: {

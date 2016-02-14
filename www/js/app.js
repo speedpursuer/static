@@ -14,10 +14,11 @@ angular.module('app', ['ionic', 'app.controllers', 'app.routes', 'app.services',
     	//debug: true,
     	usePersistentCache: true,
     	useDataURI: true,
-		skipURIencoding: true
+		  skipURIencoding: true
     });
 
     $ionicConfigProvider.views.swipeBackEnabled(false);
+    $ionicConfigProvider.scrolling.jsScrolling(false);
 })
 
 .run(function($ionicPlatform, $cordovaStatusbar, $rootScope) {
@@ -26,6 +27,7 @@ angular.module('app', ['ionic', 'app.controllers', 'app.routes', 'app.services',
       // for form inputs)
       if(window.cordova && window.cordova.plugins.Keyboard) {
         cordova.plugins.Keyboard.hideKeyboardAccessoryBar(false);
+        //cordova.plugins.Keyboard.disableScroll(true);
       }
       if(window.StatusBar) {
         // org.apache.cordova.statusbar required
@@ -40,14 +42,17 @@ angular.module('app', ['ionic', 'app.controllers', 'app.routes', 'app.services',
       function(event, toState, toParams, fromState, fromParams, error){
         console.log("stateChangeError");  
         event.preventDefault();
-    }); 
+    });
     
     /*
     window.addEventListener("orientationchange", function(){
       console.log('Orientation changed to ' + screen.orientation);
-    });*/
-
-    function abc() {
-      
+    });
+    if (window.cordova && ionic.Platform.isIOS()) {
+      alert("statusTap");
+      window.addEventListener("statusTap", function() {
+        $ionicScrollDelegate.scrollTop(true);
+      });
     }
+    */
 })

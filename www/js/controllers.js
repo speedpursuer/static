@@ -10,18 +10,16 @@ angular.module('app.controllers', [])
   	cacheViews();  	
   };
 
-  function cacheViews() {
-  	$timeout(function() {
-	  	$state.go("tabsController.favorite").then(function(result) {
-	  		$timeout(function() {
-			  	$state.go("tabsController.players").then(function(result) {
-						$timeout(function() {
-							$state.go("tabsController.stars");
-						}, 100);		
-					});
-				}, 100);		
-			});
-	  }, 100);	
+  function cacheViews() {  	
+		$state.go("tabsController.favorite").then(function(result) {
+  		$timeout(function() {
+		  	$state.go("tabsController.players").then(function(result) {
+					$timeout(function() {
+						$state.go("tabsController.stars");
+					});		
+				});
+			});		
+		});
   }
 })
 
@@ -45,9 +43,12 @@ angular.module('app.controllers', [])
    
 .controller('ClipsCtrl', function($scope, $state, $stateParams, $ionicListDelegate, FileCacheService, DBService, ErrorService, NativeService) {
 	
-	$scope.paginator = DBService.pagination().clips().getPaginator();
-	$scope.clips = $scope.paginator.currentList;
-	//$scope.noMoreItemsAvailable = DBService.pagination().clips().hasNoMore();	
+	$scope.clips = DBService.list().getClipList();	
+	$scope.noMoreItemsAvailable = DBService.pagination().clips().hasNoMore();
+
+	// $scope.clips = DBService.list().getFavoriteList();	
+	// $scope.noMoreItemsAvailable = DBService.pagination().favorite().hasNoMore();
+
 	$scope.listCanSwipe = true;	
 	$scope.playerName = $stateParams.playerName;
 	$scope.moveName = $stateParams.moveName;	
@@ -58,6 +59,12 @@ angular.module('app.controllers', [])
 			$scope.$broadcast('scroll.infiniteScrollComplete');
 		});
   };
+
+  // $scope.loadMore = function() { 
+		// DBService.pagination().favorite().more(function() {
+		// 	$scope.$broadcast('scroll.infiniteScrollComplete');
+		// });
+  // };
 
 	$scope.play = function(index) {		
 		$scope.playingClipIndex = index;
@@ -93,7 +100,7 @@ angular.module('app.controllers', [])
 	}
 })
 
-.controller('FavorateCtrl', function($scope, $state, $ionicListDelegate, $ionicPopover, ErrorService, DBService, NativeService) {
+.controller('FavorateCtrl', function($scope, $state, $ionicScrollDelegate, $ionicListDelegate, $ionicPopover, ErrorService, DBService, NativeService) {
 	
  	$scope.listCanSwipe = true;
  	$scope.playingClipIndex = "";
@@ -118,6 +125,10 @@ angular.module('app.controllers', [])
     $scope.popover = popover;
   });
   
+  $scope.getItemHeight = function(item) {
+    return angular.element(item).offsetHeight;
+  };
+  
   $scope.openPopover = function($event) {
   	$scope.search.by_player = $scope.search.selected_player;
   	$scope.search.by_move = $scope.search.selected_move;
@@ -127,6 +138,8 @@ angular.module('app.controllers', [])
   $scope.filter = function() {
 
   	ErrorService.showLoader();
+
+  	$ionicScrollDelegate.scrollTop();
 
   	var search = {
   		player: $scope.search.by_player,
@@ -140,27 +153,13 @@ angular.module('app.controllers', [])
 			ErrorService.hideLoader();
 		});
 
-  	// DBService.pagination().favorite().init(search).then(function() {					
-		// 	$scope.clips = DBService.list().getFavoriteList();
-		// 	$scope.noMoreItemsAvailable = DBService.pagination().favorite().hasNoMore();
-		// 	ErrorService.hideLoader();
-		// });
-
     $scope.popover.hide();
   };
 
-	$scope.loadMore = function() {
-  // 	DBService.pagination().favorite().more().then(function() {					
-		// 	$scope.clips = DBService.list().getFavoriteList();
-		// 	$scope.noMoreItemsAvailable = DBService.pagination().favorite().hasNoMore();
-		// }).catch(function (err) {              
-  //   	ErrorService.showAlert('无法获取数据');
-		// }).finally(function() {
-  //   	$scope.$broadcast('scroll.infiniteScrollComplete');
-  // 	});    
-			DBService.pagination().favorite().more(function() {
-				$scope.$broadcast('scroll.infiniteScrollComplete');
-			});
+	$scope.loadMore = function() { 
+		DBService.pagination().favorite().more(function() {
+			$scope.$broadcast('scroll.infiniteScrollComplete');
+		});
   };
 	
 	$scope.play = function(index) {		
@@ -190,7 +189,7 @@ angular.module('app.controllers', [])
 .controller('PlayersCtrl', function($scope, $state, DBService, ErrorService) {
 	
 	$scope.players = DBService.list().getPlayerList();
-	
+
 	$scope.doRefresh = function() {		
 		DBService.remoteDB().syncRemote(function() {
 			$scope.$broadcast('scroll.refreshComplete');

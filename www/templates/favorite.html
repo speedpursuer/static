@@ -5,7 +5,7 @@
 				</i>筛选
       </button>
     </ion-nav-buttons>		   
-    <ion-content>
+    <ion-content delegate-handle="favoriteList">
     	<div ng-show="!filtered || filtered.length == 0">
           <h3 class="empty-message">无记录</h3>
    		</div>   		
@@ -13,11 +13,7 @@
 			<ion-item ng-repeat="item in filtered = (clips | orderBy: 'timestamp': true | filter: { move: search.selected_move, player: search.selected_player })" class="item-thumbnail-left" ng-click='play($index)'>
 				<img img-cache-src ic-src="{{item.thumb}}">
 				<div class="row">
-					<div class="col col-top col-75"><h2>{{item.name}}</h2></div>
-					<div class="col col-top" ng-show="item.favorite">
-						<i class="ion-ios-basketball basketball">
-						</i>
-					</div>								
+					<div class="col col-top"><h2>{{item.name}}</h2></div>					
 				</div>
 				<div class="row">
 					<div class="col col-top"><p>{{item.desc}}</p></div>
@@ -28,7 +24,7 @@
 		</ion-list>
 		<ion-infinite-scroll
   		on-infinite="loadMore()" ng-if="!noMoreItemsAvailable.noMore"   		
-  		distance="1%">
+  		distance="10%">
 		</ion-infinite-scroll>
     </ion-content>
 </ion-view>
@@ -46,7 +42,10 @@
         <img img-cache-src ic-src="{{item.thumb}}">	            	            
        	<div class="row">
        		<div class="col col-top col-75"><h2>{{item.name}}</h2></div>
-       		
+       		<div class="col col-top" ng-show="item.favorite">
+						<i class="ion-ios-basketball basketball">
+						</i>
+					</div>								
         </div>				
 		<div class="row">  					
 			<div class="col col-top"><p>{{item.desc}}</p></div>					

@@ -3325,7 +3325,7 @@ ionic.DomUtil.ready(function() {
 
   function deactivateElements() {
     if (ionic.transition && ionic.transition.isActive) {
-      setTimeout(deactivateElements, 400);
+      setTimeout(deactivateElements, 10);
       return;
     }
 
@@ -53336,7 +53336,7 @@ IonicModule
       };
 
       window.addEventListener('statusTap', function() {
-        if($ionicScrollDelegate.getScrollPosition().top !== 0) {
+        if($ionicScrollDelegate.getScrollPosition().top > 3) {
           $ionicScrollDelegate.scrollTop(true);  
         } 
       });

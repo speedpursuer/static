@@ -1,14 +1,7 @@
 angular.module('app.services', [])
 
 
-.factory('DBService', function($q, pouchdb, ErrorService, FileCacheService) {
-
-    (function() {
-        //deleteDB();
-        //syncTo();        
-        //setupView();    
-        //testFun();
-    }());
+.factory('DBService', ['$q', '$timeout', 'pouchdb', 'ErrorService', 'FileCacheService', function($q, $timeout, pouchdb, ErrorService, FileCacheService) {
 
     var service = {};    
 
@@ -22,7 +15,12 @@ angular.module('app.services', [])
         }
     }
     
-    var db = pouchdb.create(string.dbName, {adapter: string.dbAdapter});
+    var db = null;
+
+    var isPad = (typeof device !== 'undefined' && device.model.indexOf("iPad") !== -1)? true: false;
+
+    //db.info().then(console.log.bind(console));
+    //deleteDB();
 
     service.list = function() {
         return list;
@@ -59,14 +57,7 @@ angular.module('app.services', [])
             return this.clipList;
         },
 
-        setMoveList: function(_list) {                                               
-            // if(this.moveList.length > 0) {
-            //     this.moveList.length = 0;
-            //     //this.moveList.push.apply(this.moveList, _list);
-            //     copyList(this.moveList, _list);
-            // }else {
-            //     this.moveList = _list; 
-            // }      
+        setMoveList: function(_list) {                                                             
             this.moveList.length = 0;            
             copyList(this.moveList, _list);
         },
@@ -75,14 +66,7 @@ angular.module('app.services', [])
             return this.moveList;
         },
         
-        setPlayerList: function(_list) {                                          
-            // if(this.playerList.length > 0) {
-            //     this.playerList.length = 0;
-            //     //this.playerList.push.apply(this.playerList, _list);
-            //     copyList(this.playerList, _list);
-            // }else {
-            //     this.playerList = _list; 
-            // }
+        setPlayerList: function(_list) {                                                     
             this.playerList.length = 0
             copyList(this.playerList, _list);
         },
@@ -91,20 +75,7 @@ angular.module('app.services', [])
             return this.playerList;
         },
 
-        setFavoriteList: function(_list) {     
-            // if(this.favoriteList.length) {
-            //     this.favoriteList = this.favoriteList.concat(_list);
-            // }else{
-            //     this.favoriteList = _list;           
-            // }
-
-            // if(this.favoriteList.length > 0) {
-            //     //this.favoriteList.length = 0;
-            //     //this.playerList.push.apply(this.playerList, _list);
-            //     copyList(this.favoriteList, _list);
-            // }else {
-            //     this.favoriteList = _list; 
-            // }                   
+        setFavoriteList: function(_list) {                             
             copyList(this.favoriteList, _list);
         },
 
@@ -194,8 +165,8 @@ angular.module('app.services', [])
         },
     };      
 
-    var pagination = {
-        
+    var pagination = {       
+
         clips: function() {
             return this.clipsPg;
         },
@@ -207,17 +178,10 @@ angular.module('app.services', [])
         clipsPg: {
             options: {},
             end: {noMore: true},
-            limit: 6,    
-            descending: true,
-            /*
-            paginator: {
-                currentList: list.clipList,
-                noMore: false
-            },*/
+            limit: isPad? 12: 7,    
+            descending: true,           
             init: function(playerID, moveID) {
-                this.options = {descending : this.descending, limit : this.limit, endkey: [playerID, moveID], startkey: [playerID, moveID, {}], reduce: true, group: true};
-                //this.paginator.noMore = false;
-                //this.paginator.currentList.length = 0;
+                this.options = {descending : this.descending, limit : this.limit, endkey: [playerID, moveID], startkey: [playerID, moveID, {}], reduce: true, group: true};                
                 list.resetClipList();
                 this.end.noMore = true;
                 return this.getClips();
@@ -230,18 +194,12 @@ angular.module('app.services', [])
                 }).finally(function(){
                     if(callback) callback();
                 });
-                //return this.getClips();
             },
             
-            hasNoMore: function() {
-                //return this.paginator;
+            hasNoMore: function() {                
                 return this.end;
             },
-
-            // getPaginator: function() {
-            //     return this.paginator;
-            // },
-            
+           
             getClips: function() {
 
                 var deferred = $q.defer();
@@ -255,7 +213,7 @@ angular.module('app.services', [])
                     if (result && result.rows.length > 0) {
 
                         _options.startkey = result.rows[result.rows.length - 1].key;
-                        _options.skip = 1;                      
+                        //_options.skip = 1;                                              
                                                         
                         var keys = [];
                         
@@ -287,14 +245,17 @@ angular.module('app.services', [])
                             }else{
                                 that.end.noMore = false;
                             }
+
+                            if(result.length == that.limit) {
+                                result.splice(-1,1);
+                            }                            
                             
                             list.setClipList(result);
                             deferred.resolve("More data fetched");
                         }).catch(function (err) {                
                             deferred.reject(err);                
                         });
-                    }else{
-                        //that.paginator.noMore = true;    
+                    }else{                       
                         that.end.noMore = true;            
                         deferred.resolve("No more data");             
                     }
@@ -304,72 +265,6 @@ angular.module('app.services', [])
 
                 return deferred.promise;
             },
-
-            getClips_: function() {
-
-                var deferred = $q.defer();
-
-                var that = this;
-
-                var _options = that.options;
-             
-                db.query('views/clips', _options).then(function (result) {
-
-                    if (result && result.rows.length > 0) {
-
-                        _options.startkey = result.rows[result.rows.length - 1].key;
-                        _options.skip = 1;
-
-                        if(result.rows.length < that.limit) {
-                            that.end.noMore = true;
-                        }else{
-                            that.end.noMore = false;
-                        }
-                                                        
-                        var keys = [];
-                        
-                        for(i in result.rows) {
-                            keys.push(result.rows[i].value);
-                        }
-
-                        db.query('views/local', {include_docs : true, keys: keys}).then(function (result) {
-                                                           
-                            result = result.rows.map(function(row) {
-                                var thumb = "", favorite = false;
-                                if (row.doc) {
-                                    thumb = row.doc.thumb;
-                                    favorite = row.doc.favorite;
-                                }
-                                return {
-                                    _id: row.id,
-                                    name: row.value.name,
-                                    desc: row.value.desc,
-                                    image: row.value.image,
-                                    local: row.value.local,
-                                    thumb: thumb,
-                                    favorite: favorite                        
-                                };
-                            });
-                            
-                            //that.paginator.currentList.push.apply(that.paginator.currentList, result);                            
-                            // deferred.resolve(result);
-                            //copyList(that.paginator.currentList, result);
-                            list.setClipList(result);
-                            deferred.resolve("More data fetched");
-                        }).catch(function (err) {                
-                            deferred.reject(err);                
-                        });
-                    }else{
-                        //that.paginator.noMore = true;    
-                        that.end.noMore = true;            
-                        deferred.resolve("No more data");             
-                    }
-                }).catch(function (err) {
-                    deferred.reject(err);
-                });
-
-                return deferred.promise;
-            }
         },
 
         favoritePg: {
@@ -377,7 +272,7 @@ angular.module('app.services', [])
             end: {
                 noMore: true
             },
-            limit: 6,
+            limit: isPad? 12: 7,
             view: "",
             descending: true,
             
@@ -395,8 +290,7 @@ angular.module('app.services', [])
                 list.resetFavoriteList();
 
                 if(search.player && search.move) {
-                    this.view = "favorite_player_move";
-                    //this.options = {descending : this.descending, limit : this.limit, include_docs: true, startkey: [true, search.player, search.move], endkey: [true, search.player, search.move, {}]};                
+                    this.view = "favorite_player_move";                   
                     this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true, search.player, search.move], startkey: [true, search.player, search.move, {}]};                
                 }else if(search.player) {
                     this.view = "favorite_player";
@@ -411,34 +305,20 @@ angular.module('app.services', [])
 
                 this.end.noMore = true;
 
-                this.more(callback);               
-                // this.getFavorite()
-                // .catch(function() {
-                //     ErrorService.showAlert('无法获取数据');
-                // }).finally(function() {
-                //     //this.inProgress = false;
-                //     if(callback) callback();
-                // });
+                this.more(callback);                             
             },            
-            more: function(callback) {
-                //if(this.inProgress) return;
-                //this.inProgress = true;
+            more: function(callback) {              
                 this.getFavorite()
                 .catch(function() {
                     ErrorService.showAlert('无法获取数据');
                 }).finally(function() {
-                    //this.inProgress = false;
                     if(callback) callback();
                 });
             },
             hasNoMore: function() {
                 return this.end;
             },
-            needLoad: function() {
-                //return list.getFavoriteList().length < this.limit? true: false;
-                // if(!this.hasMore() && list.getFavoriteList().length < this.limit) {
-                //     this.more();
-                // }
+            needLoad: function() {              
                 if(!this.hasNoMore().noMore && list.getFavoriteList().length < this.limit) {
                     return true;
                 }else {
@@ -458,13 +338,17 @@ angular.module('app.services', [])
                     if (result && result.rows.length > 0) {
 
                         _options.startkey = result.rows[result.rows.length - 1].key;
-                        _options.skip = 1;
+                        //_options.skip = 1;
 
                         if(result.rows.length < that.limit) {
                             that.end.noMore = true;
                         }else{
                             that.end.noMore = false;
                         }
+
+                        if(result.rows.length == that.limit) {
+                            result.rows.splice(-1,1);
+                        }   
                                                                                
                         result = result.rows.map(function(row) {
                         
@@ -507,7 +391,7 @@ angular.module('app.services', [])
                     retrieveAllMoves();
                 }                
             }).catch(function(err) {
-                ErrorService.showAlert('无法同步数据', '没有可使用的互联网连接。');
+                ErrorService.showAlert('无法同步数据', '请确认互联网连接。');
             }).finally(function(){
                 if(callback) callback();
             });
@@ -734,25 +618,23 @@ angular.module('app.services', [])
         //updateList(newsList);            
     };
 
-    service.init = function() {
-        var deferred = $q.defer();    
+    service.init = function() {        
+        var deferred = $q.defer();
+        
+        createDB();
+        
         isDBInstalled()
         .then(function() {
-            syncFromRemote().then(function(){                                   
-                retrieveAllPlayers()
-                .then(retrieveAllMoves)
-                .then(retrieveFavorites)
-                //.then(loadMoveImg)
+            syncFromRemote().then(function(){                                           
+                retrieveLists()
                 .then(function() {
                     deferred.resolve("DB Existed");
                 }).catch(function(err){                    
                     initFail();
                     deferred.reject("Err in getting init data: " + err);                     
                 });
-            }).catch(function(){                        
-                retrieveAllPlayers()
-                .then(retrieveAllMoves)
-                .then(retrieveFavorites)
+            }).catch(function(){                                   
+                retrieveLists()
                 .then(function() {
                     deferred.resolve("DB Existed");
                     ErrorService.showAlert(string.network_err.title, string.network_err.desc);
@@ -762,19 +644,20 @@ angular.module('app.services', [])
                 });
             });            
         }).catch(function() {
-            syncFromRemote()
-            .then(setupView)            
-            .then(setUpIndex)                    
-            .then(retrieveAllPlayers)
-            .then(retrieveAllMoves)
-            .then(retrieveFavorites)            
+            ErrorService.showProgress();
+            cleanDB()
+            .then(syncFromRemote)              
+            //.then(setupIndexes)
+            .then(setUpIndex)
+            .then(setupView)
+            .then(retrieveLists)           
             .then(verifyView)
-            .then(loadMoveImg)
+            .then(loadImgs)
             .then(markInstalled)    
             .then(function() {
                 deferred.resolve("DB Created");
             }).catch(function (err){                
-                console.log(err);
+                console.log("install err, details = " + err);
                 initFail();
                 deferred.reject("Err in creating DB" + err);                            
             });
@@ -783,11 +666,51 @@ angular.module('app.services', [])
         return deferred.promise;        
     };
 
+    function setupIndexes() {
+        var list = [];
+        list.push(setupView());
+        list.push(setUpIndex());
+        return executePromises(list);
+    }
+
+    function retrieveLists() {
+        //console.log("Ready for retrieveLists");
+        var list = [];
+        list.push(retrieveAllPlayers());
+        list.push(retrieveAllMoves());
+        list.push(retrieveFavorites());
+        return executePromises(list);
+    }    
+
+    function loadImgs() {
+        var list = [];
+        list.push(loadMoveImg());
+        list.push(loadPlayerImg());        
+        return executePromises(list);
+    }
+
     function loadMoveImg() {
+        //console.log("ready for loadMoveImg");
         return FileCacheService.cacheFiles(list.moveList);
     }
 
+    function loadPlayerImg() {
+        //console.log("ready for loadPlayerImg");
+        return FileCacheService.cacheAvatar(list.playerList);
+    }
+
+    function executePromises(list) {
+        var promises = [];
+
+        angular.forEach(list , function(item) {            
+            promises.push(item);
+        });
+
+        return $q.all(promises);
+    }
+    
     function verifyView() {
+        //console.log("ready for verifyView");
         var deferred = $q.defer();      
 
         var playerID = list.getPlayerList()[0]._id;    
@@ -800,6 +723,7 @@ angular.module('app.services', [])
                     move: moveID
                 };
                 pagination.favorite().init(search).then(function(result) {
+                    //console.log("Index verified");
                     deferred.resolve("Index verified");
                 }).catch(function(err) {
                     deferred.reject(err);
@@ -814,18 +738,21 @@ angular.module('app.services', [])
     }
 
     function initFail() {
-        ErrorService.showAlert("无法完成安装", "没有可使用的互联网连接。", true);         
+        ErrorService.showAlert("安装遇到小问题", "请确认互联网连接后重试。", true);         
     }
 
     function retrieveFavorites() {
+        //console.log("ready for retrieveFavorites");
         return pagination.favorite().init();
     }
 
     function retrieveAllMoves() {
+        //console.log("ready for retrieveAllMoves");
         return dataFetcher.getMoves();
     }
 
     function retrieveAllPlayers() {
+        //console.log("ready for retrieveAllPlayers");
         var deferred = $q.defer();
 
         db.query('views/players', {reduce: true, group: true, group_level: 2}).then(function (result) {            
@@ -881,7 +808,28 @@ angular.module('app.services', [])
         });
     }
 
+    function cleanDB() {      
+        var deferred = $q.defer();
+        db.destroy().then(function() {
+            createDB();
+            $timeout(function(){
+                deferred.resolve("DB recreated");
+            },10);         
+        }).catch(function() {
+            deferred.reject("DB destroy err");
+        });
+        return deferred.promise;
+    }
+
+    function createDB() {
+        if(db) {
+            db = null;
+        }
+        db = pouchdb.create(string.dbName, {size: 40, adapter: string.dbAdapter, auto_compaction: true});
+    }
+
     function syncFromRemote() {
+        //console.log("ready for syncFromRemote");
         return db.replicate.from(string.remoteURL + string.dbName);
     }
 
@@ -976,6 +924,7 @@ angular.module('app.services', [])
     }
     
     function markInstalled() {
+        //console.log("Install finished");
         return db.put({
             _id: 'DBInstalled',
             status: 'completed'
@@ -987,9 +936,9 @@ angular.module('app.services', [])
     }
 
     return service;    
-})
+}])
 
-.factory('ImgCacheService', function($q, ImgCache) {
+.factory('ImgCacheService', ['$q', 'ImgCache', function($q, ImgCache) {
 
     var service = {};
 
@@ -1011,9 +960,9 @@ angular.module('app.services', [])
     }
 
     return service;
-})
+}])
 
-.factory('FileCacheService', function($q, ImgCache) {
+.factory('FileCacheService', ['$q', 'ImgCache', function($q, ImgCache) {
 
     var service = {};
 
@@ -1044,11 +993,25 @@ angular.module('app.services', [])
         var promises = [];
 
         angular.forEach(list , function(item) {
+        
+            promises.push(cacheFile(item.image));
 
-            var promise = cacheFile(item.image);
+        });
 
-            promises.push(promise);
+        return $q.all(promises);
+    };
 
+    service.cacheAvatar = function(list){
+
+        var promises = [];
+
+        angular.forEach(list , function(item) {
+
+            promises.push(cacheFile(item.avatar));
+
+            if(item.star) {
+                promises.push(cacheFile(item.image));
+            }
         });
 
         return $q.all(promises);
@@ -1075,7 +1038,7 @@ angular.module('app.services', [])
     }
 
     return service;
-})
+}])
 
 .factory('NativeService', function() {
     
@@ -1105,32 +1068,32 @@ angular.module('app.services', [])
     return service;
 })
 
-.factory('ErrorService', function($rootScope, $ionicModal, $cordovaSplashscreen, $ionicPopup, $ionicLoading, $timeout, NativeService) {
+.factory('ErrorService', ['$rootScope', '$cordovaSplashscreen', '$ionicPopup', '$ionicLoading', '$timeout', 'NativeService', function($rootScope, $cordovaSplashscreen, $ionicPopup, $ionicLoading, $timeout, NativeService) {
                 
          
     var service = {};
                 
-    $ionicModal.fromTemplateUrl('templates/modal.html', {
-        scope: $rootScope,
-        animation: 'slide-in-up',
-        backdropClickToClose: false,
-        hardwareBackButtonClose: false
-    }).then(function(modal) {
-        $rootScope.modal = modal;
-    });
+    // $ionicModal.fromTemplateUrl('templates/modal.html', {
+    //     scope: $rootScope,
+    //     animation: 'slide-in-up',
+    //     backdropClickToClose: false,
+    //     hardwareBackButtonClose: false
+    // }).then(function(modal) {
+    //     $rootScope.modal = modal;
+    // });
 
-    service.showModal = function() {
-        if(!$rootScope.modal.isShown()){
-            $rootScope.modal.show();    
-        }        
-    };
+    // service.showModal = function() {
+    //     if(!$rootScope.modal.isShown()){
+    //         $rootScope.modal.show();    
+    //     }        
+    // };
 
-    service.hideModal = function() {
-        if($rootScope.modal.isShown()) {
-            $rootScope.modal.hide();
-            $rootScope.modal.remove();    
-        }
-    };
+    // service.hideModal = function() {
+    //     if($rootScope.modal.isShown()) {
+    //         $rootScope.modal.hide();
+    //         $rootScope.modal.remove();    
+    //     }
+    // };
 
     service.showSplashScreen = function() {
         $cordovaSplashscreen.show();
@@ -1140,6 +1103,12 @@ angular.module('app.services', [])
         $timeout(function() {
             $cordovaSplashscreen.hide();
         }, 500);   
+    };
+
+    service.showProgress = function() {        
+        $timeout(function() {
+            $cordovaSplashscreen.addProgress();
+        }, 10);  
     };
 
     service.showAlert = function(title, desc, retry) {
@@ -1163,7 +1132,7 @@ angular.module('app.services', [])
     service.showLoader = function() {
         $ionicLoading.show({
             template: '<ion-spinner icon="crescent" class="spinner-assertive"></ion-spinner>',
-            hideOnStateChange: true
+            hideOnStateChange: false
         });
     };
 
@@ -1175,4 +1144,4 @@ angular.module('app.services', [])
     };
 
     return service;
-})
+}])

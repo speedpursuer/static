@@ -13,7 +13,7 @@ angular.module('app.directives', [])
     };
 })
 
-.directive('hideTabs', function($rootScope) {
+.directive('hideTabs', ['$rootScope', function($rootScope) {
     return {
         restrict: 'A',
         link: function(scope, element, attributes) {
@@ -29,4 +29,4 @@ angular.module('app.directives', [])
             });
         }
     };
-})
+}])

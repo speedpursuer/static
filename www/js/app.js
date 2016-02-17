@@ -7,7 +7,7 @@
 // 'starter.controllers' is found in controllers.js
 angular.module('app', ['ionic', 'app.controllers', 'app.routes', 'app.services', 'app.directives', 'pouchdb', 'ImgCache', 'ngCordova'])
 
-.config(function($ionicConfigProvider, ImgCacheProvider) {
+.config(['$ionicConfigProvider', 'ImgCacheProvider', function($ionicConfigProvider, ImgCacheProvider) {
 
     // set more options at once
     ImgCacheProvider.setOptions({
@@ -19,15 +19,15 @@ angular.module('app', ['ionic', 'app.controllers', 'app.routes', 'app.services',
 
     $ionicConfigProvider.views.swipeBackEnabled(false);
     $ionicConfigProvider.scrolling.jsScrolling(false);
-})
+}])
 
-.run(function($ionicPlatform, $cordovaStatusbar, $rootScope) {
+.run(['$ionicPlatform', '$cordovaStatusbar', '$rootScope', function($ionicPlatform, $cordovaStatusbar, $rootScope) {
     $ionicPlatform.ready(function() {
       // Hide the accessory bar by default (remove this to show the accessory bar above the keyboard
       // for form inputs)
       if(window.cordova && window.cordova.plugins.Keyboard) {
         cordova.plugins.Keyboard.hideKeyboardAccessoryBar(false);
-        //cordova.plugins.Keyboard.disableScroll(true);
+        cordova.plugins.Keyboard.disableScroll(true);
       }
       if(window.StatusBar) {
         // org.apache.cordova.statusbar required
@@ -55,4 +55,4 @@ angular.module('app', ['ionic', 'app.controllers', 'app.routes', 'app.services',
       });
     }
     */
-})
+}])

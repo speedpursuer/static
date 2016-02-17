@@ -1,0 +1,29 @@
+<ion-view title="最新内容">
+    <ion-content>
+    	<ion-refresher
+            pulling-text="下拉获取更新..."
+            on-refresh="doRefresh()">
+      </ion-refresher>      
+			<ion-list can-swipe="listCanSwipe" id="ClipsScopeID">
+				<ion-item ng-repeat="item in clips|orderBy:'_id':true" class="item-thumbnail-left" ng-click='play($index)'>
+					<img img-cache-src ic-src="{{item.thumb}}">
+					<div class="row">
+						<div class="col col-top col-75"><h2>{{item.name}}</h2></div>
+						<div class="col col-top" ng-show="item.favorite">
+							<i class="ion-ios-heart-outline assertive">
+							</i>
+						</div>								
+					</div>
+					<div class="row">
+						<div class="col col-top"><p>{{item.desc}}</p></div>
+					</div>
+					<ion-option-button class="button-assertive ion-ios-heart" ng-click="updateFavorite($index)">					
+					</ion-option-button>
+				</ion-item>
+			</ion-list>
+			<ion-infinite-scroll
+    		on-infinite="loadMore()" ng-if="!noMoreItemsAvailable"   		
+    		distance="1%">
+  		</ion-infinite-scroll>
+    </ion-content>
+</ion-view>

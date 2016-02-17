@@ -1,8 +1,8 @@
 angular.module('app.controllers', [])
 
-.controller('RootCtrl', function($scope, $rootScope, $state, $timeout, $ionicModal, ErrorService) {
+.controller('RootCtrl', ['$scope', '$state', '$timeout', function($scope, $state, $timeout) {
 	
-	(function() {		
+	(function() {
 		cacheViews();
 	}());	  
 
@@ -10,7 +10,7 @@ angular.module('app.controllers', [])
   	cacheViews();  	
   };
 
-  function cacheViews() {  	
+  function cacheViews() {
 		$state.go("tabsController.favorite").then(function(result) {
   		$timeout(function() {
 		  	$state.go("tabsController.players").then(function(result) {
@@ -21,9 +21,9 @@ angular.module('app.controllers', [])
 			});		
 		});
   }
-})
+}])
 
-.controller('StarsCtrl', function($scope, $ionicSlideBoxDelegate, $state, ErrorService, stars) {
+.controller('StarsCtrl', ['$scope', '$ionicSlideBoxDelegate', '$state', 'ErrorService', 'stars', function($scope, $ionicSlideBoxDelegate, $state, ErrorService, stars) {
   	
 	(function() {
 		renderPlayList(stars);		
@@ -39,9 +39,9 @@ angular.module('app.controllers', [])
  	$scope.showMoves = function(playerID, playerName) {
 		$state.go("tabsController.moves", {playerID: playerID, playerName: playerName});
 	};	
-})
+}])
    
-.controller('ClipsCtrl', function($scope, $state, $stateParams, $ionicListDelegate, FileCacheService, DBService, ErrorService, NativeService) {
+.controller('ClipsCtrl', ['$scope', '$stateParams', '$ionicListDelegate', 'DBService', 'NativeService' ,function($scope, $stateParams, $ionicListDelegate, DBService, NativeService) {
 	
 	$scope.clips = DBService.list().getClipList();	
 	$scope.noMoreItemsAvailable = DBService.pagination().clips().hasNoMore();
@@ -98,9 +98,9 @@ angular.module('app.controllers', [])
 		DBService.updateFavorite($scope.clips[index]._id, $scope.clips[index].local, !$scope.clips[index].favorite);
 		$scope.clips[index].favorite = !$scope.clips[index].favorite;
 	}
-})
+}])
 
-.controller('FavorateCtrl', function($scope, $state, $ionicScrollDelegate, $ionicListDelegate, $ionicPopover, ErrorService, DBService, NativeService) {
+.controller('FavorateCtrl', ['$scope', '$state', '$ionicScrollDelegate', '$ionicListDelegate', '$ionicPopover', 'ErrorService', 'DBService', 'NativeService', function($scope, $state, $ionicScrollDelegate, $ionicListDelegate, $ionicPopover, ErrorService, DBService, NativeService) {
 	
  	$scope.listCanSwipe = true;
  	$scope.playingClipIndex = "";
@@ -124,10 +124,6 @@ angular.module('app.controllers', [])
   }).then(function(popover) {
     $scope.popover = popover;
   });
-  
-  $scope.getItemHeight = function(item) {
-    return angular.element(item).offsetHeight;
-  };
   
   $scope.openPopover = function($event) {
   	$scope.search.by_player = $scope.search.selected_player;
@@ -184,9 +180,9 @@ angular.module('app.controllers', [])
 	function setFavorite(index) {
 		DBService.updateFavorite($scope.clips[index]._id, $scope.clips[index].local, false);		
 	}
-})
+}])
 
-.controller('PlayersCtrl', function($scope, $state, DBService, ErrorService) {
+.controller('PlayersCtrl', ['$scope', '$state', 'DBService', function($scope, $state, DBService) {
 	
 	$scope.players = DBService.list().getPlayerList();
 
@@ -199,9 +195,9 @@ angular.module('app.controllers', [])
 	$scope.showMoves = function(playerID, playerName) {
 		$state.go("tabsController.tab2Moves", {playerID: playerID, playerName: playerName});
 	};
-})
+}])
 
-.controller('MovesCtrl', function($scope, $state, $stateParams, $ionicListDelegate, FileCacheService, DBService, ErrorService, moves) {
+.controller('MovesCtrl', ['$scope', '$state', '$stateParams', 'moves', function($scope, $state, $stateParams, moves) {
 
 	$scope.moves = moves;
 	$scope.playerName = $stateParams.playerName;
@@ -210,9 +206,9 @@ angular.module('app.controllers', [])
 		$state.go("tabsController.clips", {playerID: $stateParams.playerID, moveName: moveName, moveID: moveID});
 	};
 
-})
+}])
 
-.controller('Tab2MovesCtrl', function($scope, $state, $stateParams, $ionicListDelegate, FileCacheService, DBService, ErrorService, moves) {
+.controller('Tab2MovesCtrl', ['$scope', '$state', '$stateParams', 'moves', function($scope, $state, $stateParams, moves) {
 	
 	$scope.moves = moves;
 	$scope.playerName = $stateParams.playerName;
@@ -221,7 +217,7 @@ angular.module('app.controllers', [])
 		$state.go("tabsController.tab2Clips", {playerID: $stateParams.playerID, moveName: moveName, moveID: moveID});
 	};
 
-})
+}])
 
 /*
  // 	DBService.pagination().clips().more().then(function(clips) {			

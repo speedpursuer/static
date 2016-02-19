@@ -68,7 +68,8 @@ ion-tabs.tabs-color-active-assertive .tab-item.tab-item-active, .basketball{
 	text-align: center;
 	background-color: black;
 	background-repeat: no-repeat;
-	background-position: 40% 0%;
+	/*background-position: 40% 0%;*/
+	background-position: center 0%;
 }
 
 .boxLoading {

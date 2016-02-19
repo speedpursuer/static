@@ -145,10 +145,13 @@ angular.module('app.services', [])
             return deferred.promise;
         },
 
-        getMovesByPlayer: function(playerID) {
+        getMovesByPlayer: function(playerID, noResult) {
             var deferred = $q.defer();
+            var option = {startkey: [playerID], endkey: [playerID, {}], reduce: true, group: true};
+
+            if(noResult) option.limit = 0;
             
-            db.query('views/moves', {startkey: [playerID], endkey: [playerID, {}], reduce: true, group: true}).then(function (result) {
+            db.query('views/moves', option).then(function (result) {
                           
                 var moves = [];
 
@@ -162,7 +165,7 @@ angular.module('app.services', [])
             }); 
 
             return deferred.promise;       
-        },
+        },        
     };      
 
     var pagination = {       
@@ -180,8 +183,9 @@ angular.module('app.services', [])
             end: {noMore: true},
             limit: isPad? 12: 7,    
             descending: true,           
-            init: function(playerID, moveID) {
+            init: function(playerID, moveID, noResult) {
                 this.options = {descending : this.descending, limit : this.limit, endkey: [playerID, moveID], startkey: [playerID, moveID, {}], reduce: true, group: true};                
+                if(noResult) this.options.limit = 1;
                 list.resetClipList();
                 this.end.noMore = true;
                 return this.getClips();
@@ -303,10 +307,38 @@ angular.module('app.services', [])
                     this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true], startkey: [true, {}]};    
                 }
 
+                if(search.noResult) this.options.limit = 0;
+
                 this.end.noMore = true;
 
                 this.more(callback);                             
-            },            
+            },      
+
+            search_: function(search, callback) {
+
+                if(!search) search = {};
+
+                list.resetFavoriteList();
+
+                if(search.player && search.move) {
+                    this.view = "favorite_player_move";                   
+                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true, search.player, search.move], startkey: [true, search.player, search.move, {}]};                
+                }else if(search.player) {
+                    this.view = "favorite_player";
+                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true, search.player], startkey: [true, search.player, {}]};                
+                }else if(search.move) {
+                    this.view = "favorite_move";
+                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true, search.move], startkey: [true, search.move, {}]};
+                }else {
+                    this.view = "favorite";
+                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true], startkey: [true, {}]};    
+                }
+
+                this.end.noMore = true;
+
+                this.more(callback);                             
+            },   
+
             more: function(callback) {              
                 this.getFavorite()
                 .catch(function() {
@@ -387,13 +419,18 @@ angular.module('app.services', [])
         syncRemote: function(callback) {
             syncFromRemote().then(function(result) {
                 if(result.docs_written > 0) {
-                    retrieveAllPlayers();
-                    retrieveAllMoves();
-                }                
+                    //retrieveAllPlayers();
+                    //retrieveAllMoves();
+                    //verifyView();
+                    reIndex().then(refreshAllPlayers).finally(function(){
+                        if(callback) callback();        
+                    });
+                }else{                    
+                    if(callback) callback();
+                }
             }).catch(function(err) {
-                ErrorService.showAlert('无法同步数据', '请确认互联网连接。');
-            }).finally(function(){
                 if(callback) callback();
+                ErrorService.showAlert('无法同步数据', '请确认互联网连接。');
             });
         },    
 
@@ -625,9 +662,26 @@ angular.module('app.services', [])
         
         isDBInstalled()
         .then(function() {
-            syncFromRemote().then(function(){                                           
+            syncFromRemote().then(function(result){                                           
                 retrieveLists()
-                .then(function() {
+                .then(reIndex)
+                .then(function() {                    
+                    // if(result.docs_written > 0) {
+                    //     // reIndex().then(function(){
+                    //     //     deferred.resolve("DB Existed and reindexed");
+                    //     // }).catch(function() {
+                    //     //     deferred.resolve("DB Existed but not reindexed");
+                    //     // });
+                    //     reIndex().finally(function(){
+                    //         deferred.resolve("DB Existed");
+                    //     });
+                    // }else{
+                    //     deferred.resolve("DB Existed");
+                    // }
+
+                    // reIndex().finally(function(){
+                    //     deferred.resolve("DB Existed");
+                    // });
                     deferred.resolve("DB Existed");
                 }).catch(function(err){                    
                     initFail();
@@ -635,6 +689,7 @@ angular.module('app.services', [])
                 });
             }).catch(function(){                                   
                 retrieveLists()
+                .then(reIndex)
                 .then(function() {
                     deferred.resolve("DB Existed");
                     ErrorService.showAlert(string.network_err.title, string.network_err.desc);
@@ -643,7 +698,8 @@ angular.module('app.services', [])
                     deferred.reject("Err in getting init data: " + err);                     
                 });
             });            
-        }).catch(function() {
+        }).catch(function(e) {
+            console.log("Cannot find install flag due to: " + e);
             ErrorService.showProgress();
             cleanDB()
             .then(syncFromRemote)              
@@ -651,14 +707,15 @@ angular.module('app.services', [])
             .then(setUpIndex)
             .then(setupView)
             .then(retrieveLists)           
-            .then(verifyView)
+            //.then(verifyView)
+            .then(reIndex)
             .then(loadImgs)
             .then(markInstalled)    
             .then(function() {
                 deferred.resolve("DB Created");
             }).catch(function (err){                
                 console.log("install err, details = " + err);
-                initFail();
+                installFail();
                 deferred.reject("Err in creating DB" + err);                            
             });
         });
@@ -666,7 +723,7 @@ angular.module('app.services', [])
         return deferred.promise;        
     };
 
-    function setupIndexes() {
+    function setupIndexes() {        
         var list = [];
         list.push(setupView());
         list.push(setUpIndex());
@@ -674,15 +731,16 @@ angular.module('app.services', [])
     }
 
     function retrieveLists() {
-        //console.log("Ready for retrieveLists");
+        //console.log("Start to retrieveLists");
         var list = [];
         list.push(retrieveAllPlayers());
         list.push(retrieveAllMoves());
         list.push(retrieveFavorites());
         return executePromises(list);
-    }    
+    }   
 
     function loadImgs() {
+        //console.log("Start to loadPlayerImg");
         var list = [];
         list.push(loadMoveImg());
         list.push(loadPlayerImg());        
@@ -709,8 +767,8 @@ angular.module('app.services', [])
         return $q.all(promises);
     }
     
-    function verifyView() {
-        //console.log("ready for verifyView");
+    function verifyView() {        
+        //console.log("Start to verifyView");
         var deferred = $q.defer();      
 
         var playerID = list.getPlayerList()[0]._id;    
@@ -737,8 +795,49 @@ angular.module('app.services', [])
         return deferred.promise;        
     }
 
-    function initFail() {
+    function reIndex() {        
+        
+        var playerID = list.getPlayerList()[0]._id,
+
+            moveID = list.getMoveList()[0]._id,
+
+            // search = {
+            //     player: playerID,
+            //     move: moveID,
+            //     noResult: true
+            // },
+
+            // search1 = {                
+            //     move: moveID,
+            //     noResult: true
+            // },
+
+            // search2 = {
+            //     player: playerID,
+            //     noResult: true
+            // },
+
+            promiseList = [];
+
+        promiseList.push(dataFetcher.getMovesByPlayer(playerID, true));       
+
+        promiseList.push(pagination.clips().init(playerID, moveID, true));
+
+        // promiseList.push(pagination.favorite().search(search));
+
+        // promiseList.push(pagination.favorite().search(search1));
+
+        // promiseList.push(pagination.favorite().search(search2));
+
+        return executePromises(promiseList);
+    }
+
+    function installFail() {
         ErrorService.showAlert("安装遇到小问题", "请确认互联网连接后重试。", true);         
+    }
+
+    function initFail() {
+        ErrorService.showAlert("启动遇到小问题", "请重启再试。", false);         
     }
 
     function retrieveFavorites() {
@@ -792,6 +891,57 @@ angular.module('app.services', [])
         return deferred.promise;
     }
 
+    function refreshAllPlayers() {
+
+        var deferred = $q.defer();
+
+        db.query('views/players', {reduce: true, group: true, group_level: 2}).then(function (result) {            
+            
+            var keys = [], qtys = [];
+            var players = list.playerList;
+            
+            for(i in result.rows) {
+                
+                var index = findIndex(players, result.rows[i].key);    
+
+                if(index == -1) {
+                    keys.push(result.rows[i].key);
+                    qtys.push(result.rows[i].value);                
+                } else {
+                    if(players[index].clipQty != result.rows[i].value) {
+                        players[index].clipQty = result.rows[i].value;
+                    }    
+                }             
+            }
+
+            if (keys.length > 0) {
+                db.allDocs({
+                    include_docs: true,
+                    keys: keys
+                }).then(function (result) {
+                                    
+                    for(i in result.rows) {
+                        result.rows[i].doc.clipQty = qtys[i];
+                        insertArray(players, result.rows[i].doc);
+                    }
+
+                    deferred.resolve("All players refreshed");
+
+                }).catch(function (err) {
+                    deferred.reject(err);
+                });
+
+            }else {
+                deferred.resolve("All players refreshed");
+            }
+
+        }).catch(function (err) {
+            deferred.reject(err);
+        });
+
+        return deferred.promise;
+    }
+
     function copyList(desc, source) {
         desc.push.apply(desc, source);
     }
@@ -826,14 +976,20 @@ angular.module('app.services', [])
             db = null;
         }
         db = pouchdb.create(string.dbName, {size: 40, adapter: string.dbAdapter, auto_compaction: true});
+        //db = pouchdb.create(string.dbName, {adapter: string.dbAdapter});        
+        //db = pouchdb.create(string.dbName, {size: 40, adapter: string.dbAdapter, auto_compaction: false});
+        //db = pouchdb.create(string.dbName, {auto_compaction: true});
+        //db.info().then(console.log.bind(console));
     }
 
     function syncFromRemote() {
-        //console.log("ready for syncFromRemote");
-        return db.replicate.from(string.remoteURL + string.dbName);
+        console.log("Start to SyncFromRemote from: " + string.remoteURL + string.dbName);
+        if(!db) console.log("DB is null when SyncFromRemote");
+        return db.replicate.from(string.remoteURL + string.dbName, {timeout: 10000});
     }
 
     function setupView() {
+        console.log("Start to setupView");
         var ddoc = {
             _id: '_design/views',
             views: {
@@ -916,6 +1072,7 @@ angular.module('app.services', [])
     }    
 
     function setUpIndex() {
+        //console.log("Start to setupIndex");
     	return db.createIndex({
     		index: {
     			fields: ['type']
@@ -933,6 +1090,30 @@ angular.module('app.services', [])
 
     function isDBInstalled() {
         return db.get('DBInstalled');
+    }
+
+    function findIndex(array, id) {  
+        var low = 0, high = array.length, mid;
+        while (low < high) {
+            mid = (low + high) >>> 1;
+            if(array[mid]._id == id) {
+                return mid;
+            }else{
+                array[mid]._id < id ? low = mid + 1 : high = mid    
+            }
+        }
+        return -1;
+    }
+
+    function insertArray(array, obj) {
+        var i = array.length - 1;
+        while (i >= 0) {
+           if(obj._id > array[i]._id){
+              array.splice(i+1, 0, obj);
+              break;
+           }
+           i--;
+        }
     }
 
     return service;    

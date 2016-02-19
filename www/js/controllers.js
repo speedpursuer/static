@@ -42,7 +42,7 @@ angular.module('app.controllers', [])
 }])
    
 .controller('ClipsCtrl', ['$scope', '$stateParams', '$ionicListDelegate', 'DBService', 'NativeService' ,function($scope, $stateParams, $ionicListDelegate, DBService, NativeService) {
-	
+	//console.log("Got to clip");
 	$scope.clips = DBService.list().getClipList();	
 	$scope.noMoreItemsAvailable = DBService.pagination().clips().hasNoMore();
 
@@ -193,6 +193,7 @@ angular.module('app.controllers', [])
 	};	
 		
 	$scope.showMoves = function(playerID, playerName) {
+		//console.log("Ready to move");
 		$state.go("tabsController.tab2Moves", {playerID: playerID, playerName: playerName});
 	};
 }])
@@ -209,11 +210,12 @@ angular.module('app.controllers', [])
 }])
 
 .controller('Tab2MovesCtrl', ['$scope', '$state', '$stateParams', 'moves', function($scope, $state, $stateParams, moves) {
-	
+	//console.log("Got to move");
 	$scope.moves = moves;
 	$scope.playerName = $stateParams.playerName;
 
 	$scope.showClips = function(moveName, moveID) {
+		//console.log("Ready to clip");
 		$state.go("tabsController.tab2Clips", {playerID: $stateParams.playerID, moveName: moveName, moveID: moveID});
 	};
 

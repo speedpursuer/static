@@ -40,7 +40,7 @@ angular.module('app', ['ionic', 'app.controllers', 'app.routes', 'app.services',
 
     $rootScope.$on('$stateChangeError', 
       function(event, toState, toParams, fromState, fromParams, error){
-        console.log("stateChangeError");  
+        console.log("stateChangeError: " + error);  
         event.preventDefault();
     });
     

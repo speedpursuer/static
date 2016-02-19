@@ -55889,17 +55889,19 @@ function($scope, $attrs, $element, $timeout) {
   self.checkBounds = ionic.Utils.throttle(checkInfiniteBounds, 300);
 
   function onInfinite() {
-    ionic.requestAnimationFrame(function() {
-      $element[0].classList.add('active');
-    });
+    $element[0].classList.add('active');
+    // ionic.requestAnimationFrame(function() {
+    //   $element[0].classList.add('active');
+    // });
     self.isLoading = true;
     $scope.$parent && $scope.$parent.$apply($attrs.onInfinite || '');
   }
 
   function finishInfiniteScroll() {
-    ionic.requestAnimationFrame(function() {
-      $element[0].classList.remove('active');
-    });
+    $element[0].classList.remove('active');
+    // ionic.requestAnimationFrame(function() {
+    //   $element[0].classList.remove('active');
+    // });
     $timeout(function() {
       if (self.jsScrolling) self.scrollView.resize();
       // only check bounds again immediately if the page isn't cached (scroll el has height)

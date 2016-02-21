@@ -6,8 +6,9 @@ angular.module('app.services', [])
     var service = {};    
 
     var string = {
-        dbName: "cliplay",
-        remoteURL: dbString? dbString: "http://admin:12341234@localhost:5984/",        
+        dbName: "cliplay",        
+        remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",        
+        file: dbString? dbString.split(",")[1]: "db.txt",
         dbAdapter: "websql",
         network_err: {
             title: "无法获取最新数据",
@@ -18,6 +19,8 @@ angular.module('app.services', [])
     var db = null;
 
     var isPad = (typeof device !== 'undefined' && device.model.indexOf("iPad") !== -1)? true: false;
+
+    var dataString = 
 
     //db.info().then(console.log.bind(console));
     //deleteDB();
@@ -145,11 +148,9 @@ angular.module('app.services', [])
             return deferred.promise;
         },
 
-        getMovesByPlayer: function(playerID, noResult) {
+        getMovesByPlayer: function(playerID) {
             var deferred = $q.defer();
             var option = {startkey: [playerID], endkey: [playerID, {}], reduce: true, group: true};
-
-            if(noResult) option.limit = 0;
             
             db.query('views/moves', option).then(function (result) {
                           
@@ -162,6 +163,17 @@ angular.module('app.services', [])
 
             }).catch(function (err) {
                 deferred.reject(err);
+            }); 
+
+            return deferred.promise;       
+        },
+
+        testMovesByPlayer: function(playerID) {
+            var deferred = $q.defer();
+            var option = {startkey: [playerID], endkey: [playerID, {}], reduce: true, group: true, limit: 0};
+            
+            db.query('views/moves', option).finally(function() {
+                deferred.resolve("move retrieved");
             }); 
 
             return deferred.promise;       
@@ -183,9 +195,8 @@ angular.module('app.services', [])
             end: {noMore: true},
             limit: isPad? 12: 7,    
             descending: true,           
-            init: function(playerID, moveID, noResult) {
-                this.options = {descending : this.descending, limit : this.limit, endkey: [playerID, moveID], startkey: [playerID, moveID, {}], reduce: true, group: true};                
-                if(noResult) this.options.limit = 1;
+            init: function(playerID, moveID) {
+                this.options = {descending : this.descending, limit : this.limit, endkey: [playerID, moveID], startkey: [playerID, moveID, {}], reduce: true, group: true};                                
                 list.resetClipList();
                 this.end.noMore = true;
                 return this.getClips();
@@ -269,6 +280,26 @@ angular.module('app.services', [])
 
                 return deferred.promise;
             },
+
+            testClips: function(playerID, moveID) {
+
+                var deferred = $q.defer();
+
+                var options = {descending: true, limit: 1, endkey: [playerID, moveID], startkey: [playerID, moveID, {}], reduce: true, group: true};                
+             
+                db.query('views/clips', options).then(function (result) {
+                    
+                    db.query('views/local', {include_docs : true, key: result.rows[0].value})
+                    .finally(function () {
+                        deferred.resolve("data fetched");
+                    });
+
+                }).catch(function (err) {
+                    deferred.resolve("data not fetched");
+                });
+
+                return deferred.promise;
+            }
         },
 
         favoritePg: {
@@ -313,31 +344,6 @@ angular.module('app.services', [])
 
                 this.more(callback);                             
             },      
-
-            search_: function(search, callback) {
-
-                if(!search) search = {};
-
-                list.resetFavoriteList();
-
-                if(search.player && search.move) {
-                    this.view = "favorite_player_move";                   
-                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true, search.player, search.move], startkey: [true, search.player, search.move, {}]};                
-                }else if(search.player) {
-                    this.view = "favorite_player";
-                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true, search.player], startkey: [true, search.player, {}]};                
-                }else if(search.move) {
-                    this.view = "favorite_move";
-                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true, search.move], startkey: [true, search.move, {}]};
-                }else {
-                    this.view = "favorite";
-                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true], startkey: [true, {}]};    
-                }
-
-                this.end.noMore = true;
-
-                this.more(callback);                             
-            },   
 
             more: function(callback) {              
                 this.getFavorite()
@@ -411,7 +417,7 @@ angular.module('app.services', [])
                 });
 
                 return deferred.promise;
-            }  
+            }
         }
     };
 
@@ -656,8 +662,9 @@ angular.module('app.services', [])
     };
 
     service.init = function() {        
-        var deferred = $q.defer();
         
+        var deferred = $q.defer();
+    
         createDB();
         
         isDBInstalled()
@@ -700,26 +707,33 @@ angular.module('app.services', [])
             });            
         }).catch(function(e) {
             console.log("Cannot find install flag due to: " + e);
-            ErrorService.showProgress();
-            cleanDB()
-            .then(syncFromRemote)              
-            //.then(setupIndexes)
-            .then(setUpIndex)
-            .then(setupView)
-            .then(retrieveLists)           
-            //.then(verifyView)
-            .then(reIndex)
-            .then(loadImgs)
-            .then(markInstalled)    
-            .then(function() {
-                deferred.resolve("DB Created");
-            }).catch(function (err){                
-                console.log("install err, details = " + err);
+
+            if(navigator.connection.type === Connection.NONE) {
+                console.log("No network connect");
                 installFail();
-                deferred.reject("Err in creating DB" + err);                            
-            });
+                deferred.reject("No network connect");                            
+            }else{
+                //ErrorService.showProgress();
+                cleanDB()
+                //.then(syncFromRemote)                          
+                .then(loadDBDump)
+                //.then(setUpIndex)
+                //.then(setupView)
+                .then(retrieveListsForInstall)
+                .then(reIndex)
+                //.then(syncToRemote)
+                .then(loadImgs)            
+                .then(markInstalled)
+                .then(function() {
+                    deferred.resolve("DB Created");
+                }).catch(function (err){                
+                    console.log("install err, details = " + err);
+                    installFail();
+                    deferred.reject("Err in creating DB" + err);                            
+                });      
+            }
         });
-      
+
         return deferred.promise;        
     };
 
@@ -730,17 +744,21 @@ angular.module('app.services', [])
         return executePromises(list);
     }
 
-    function retrieveLists() {
-        //console.log("Start to retrieveLists");
+    function retrieveLists(isInstall) {
+        console.log("Start to retrieveLists");
         var list = [];
         list.push(retrieveAllPlayers());
         list.push(retrieveAllMoves());
-        list.push(retrieveFavorites());
+        if(!isInstall) list.push(retrieveFavorites());
         return executePromises(list);
+    }
+
+    function retrieveListsForInstall(){
+        return retrieveLists(true);
     }   
 
     function loadImgs() {
-        //console.log("Start to loadPlayerImg");
+        console.log("Start to loadPlayerImg");
         var list = [];
         list.push(loadMoveImg());
         list.push(loadPlayerImg());        
@@ -799,35 +817,13 @@ angular.module('app.services', [])
         
         var playerID = list.getPlayerList()[0]._id,
 
-            moveID = list.getMoveList()[0]._id,
-
-            // search = {
-            //     player: playerID,
-            //     move: moveID,
-            //     noResult: true
-            // },
-
-            // search1 = {                
-            //     move: moveID,
-            //     noResult: true
-            // },
-
-            // search2 = {
-            //     player: playerID,
-            //     noResult: true
-            // },
+            moveID = list.getMoveList()[1]._id,
 
             promiseList = [];
 
-        promiseList.push(dataFetcher.getMovesByPlayer(playerID, true));       
+        promiseList.push(dataFetcher.testMovesByPlayer(playerID));       
 
-        promiseList.push(pagination.clips().init(playerID, moveID, true));
-
-        // promiseList.push(pagination.favorite().search(search));
-
-        // promiseList.push(pagination.favorite().search(search1));
-
-        // promiseList.push(pagination.favorite().search(search2));
+        promiseList.push(pagination.clips().testClips(playerID, moveID));
 
         return executePromises(promiseList);
     }
@@ -959,12 +955,14 @@ angular.module('app.services', [])
     }
 
     function cleanDB() {      
+        console.log("Start to cleanDB");
         var deferred = $q.defer();
         db.destroy().then(function() {
             createDB();
-            $timeout(function(){
-                deferred.resolve("DB recreated");
-            },10);         
+            deferred.resolve("DB recreated");
+            // $timeout(function(){
+            //     deferred.resolve("DB recreated");
+            // },10);         
         }).catch(function() {
             deferred.reject("DB destroy err");
         });
@@ -975,7 +973,9 @@ angular.module('app.services', [])
         if(db) {
             db = null;
         }
+        console.log("Start to createDB");
         db = pouchdb.create(string.dbName, {size: 40, adapter: string.dbAdapter, auto_compaction: true});
+        //deleteDB();
         //db = pouchdb.create(string.dbName, {adapter: string.dbAdapter});        
         //db = pouchdb.create(string.dbName, {size: 40, adapter: string.dbAdapter, auto_compaction: false});
         //db = pouchdb.create(string.dbName, {auto_compaction: true});
@@ -987,6 +987,32 @@ angular.module('app.services', [])
         if(!db) console.log("DB is null when SyncFromRemote");
         return db.replicate.from(string.remoteURL + string.dbName, {timeout: 10000});
     }
+
+    function syncToRemote() {
+        console.log("Start to syncToRemote from: " + string.remoteURL + string.dbName);
+        if(!db) console.log("DB is null when syncToRemote");
+        return db.replicate.to(string.remoteURL + string.dbName, {timeout: 10000});   
+    }
+
+    function loadDBDump() {
+        console.log("Start to loadDBDump");
+        
+        var deferred = $q.defer();      
+
+        if(isCordova()) {            
+            $.get(string.file, function(res) {                
+                deferred.resolve(db.load(res));
+            });
+        }else{
+            deferred.resolve(db.load(string.file));
+        }
+
+        return deferred.promise;
+    }
+
+    function isCordova() {
+        return (typeof cordova !== 'undefined' || typeof phonegap !== 'undefined');
+    };
 
     function setupView() {
         console.log("Start to setupView");
@@ -1072,7 +1098,7 @@ angular.module('app.services', [])
     }    
 
     function setUpIndex() {
-        //console.log("Start to setupIndex");
+        console.log("Start to setupIndex");
     	return db.createIndex({
     		index: {
     			fields: ['type']
@@ -1081,15 +1107,15 @@ angular.module('app.services', [])
     }
     
     function markInstalled() {
-        //console.log("Install finished");
+        console.log("Install finished");
         return db.put({
-            _id: 'DBInstalled',
+            _id: '_local/DBInstalled',
             status: 'completed'
         });
     }
 
     function isDBInstalled() {
-        return db.get('DBInstalled');
+        return db.get('_local/DBInstalled');
     }
 
     function findIndex(array, id) {  

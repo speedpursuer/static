@@ -17,7 +17,7 @@ var dbString = "";
 function startForIOS() {
     cordova.exec(
         function(r){
-            console.log("dbstring = " + r);
+            //console.log("dbstring = " + r);
             dbString = r;
             angular.bootstrap(document.body, ['app']);            
         }, 

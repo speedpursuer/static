@@ -6,21 +6,15 @@ angular.module('app.services', [])
     var service = {};    
 
     var string = {
-        dbName: "cliplay",        
+        dbName: "cliplay",     
         remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",        
         file: dbString? dbString.split(",")[1]: "db.txt",
-        dbAdapter: "websql",
-        network_err: {
-            title: "无法获取最新数据",
-            desc: "没有可使用的互联网连接。"
-        }
+        dbAdapter: "websql"
     }
     
     var db = null;
 
     var isPad = (typeof device !== 'undefined' && device.model.indexOf("iPad") !== -1)? true: false;
-
-    var dataString = 
 
     //db.info().then(console.log.bind(console));
     //deleteDB();
@@ -320,9 +314,7 @@ angular.module('app.services', [])
             },
             search: function(search, callback) {
 
-                if(!search) search = {};
-
-                list.resetFavoriteList();
+                if(!search) search = {};                
 
                 if(search.player && search.move) {
                     this.view = "favorite_player_move";                   
@@ -338,13 +330,19 @@ angular.module('app.services', [])
                     this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true], startkey: [true, {}]};    
                 }
 
-                if(search.noResult) this.options.limit = 0;
+                if(search.noResult) {
+                    this.options.limit = 0;
+                }else {
+                    list.resetFavoriteList();
+                }
 
                 this.end.noMore = true;
 
                 this.more(callback);                             
-            },      
-
+            },   
+            testFavorite: function() {
+                //this.search()
+            },
             more: function(callback) {              
                 this.getFavorite()
                 .catch(function() {
@@ -436,7 +434,7 @@ angular.module('app.services', [])
                 }
             }).catch(function(err) {
                 if(callback) callback();
-                ErrorService.showAlert('无法同步数据', '请确认互联网连接。');
+                syncFail();
             });
         },    
 
@@ -662,7 +660,80 @@ angular.module('app.services', [])
     };
 
     service.init = function() {        
+
+        var deferred = $q.defer();
+    
+        createDB();
         
+        isDBInstalled()
+        .then(function() {        
+            syncData(deferred, false);
+        }).catch(function(e) {
+            cleanDB()
+            .then(loadDBDump)
+            .then(markInstalled)
+            .then(function() {
+                console.log("DB installed");
+                syncData(deferred, true);
+            }).catch(function (err){                
+                console.log("install err, details = " + err);
+                initFail();
+                deferred.reject("Err in creating DB" + err);                            
+            });
+        });
+
+        return deferred.promise;        
+    };
+
+    function bootstrap(deferred, callback) {       
+        retrieveLists()
+        .then(reIndex)
+        .then(function() {                   
+            deferred.resolve("data prefetched");
+            if(callback) callback();
+        }).catch(function(err){                    
+            initFail();
+            deferred.reject("Err in getting init data: " + err);                     
+        });
+    }
+
+    function bootstrapForInstall(deferred, callback) {       
+        retrieveListsForInstall()
+        .then(reIndexForInstall)
+        .then(loadImgs)
+        .then(function() {                 
+            deferred.resolve("data prefetched");
+            if(callback) callback();
+        }).catch(function(err){                    
+            initFail();
+            deferred.reject("Err in getting init data: " + err);                     
+        });
+    }
+
+    function syncData(deferred, install) {
+        syncFromRemote().then(function(result){
+            console.log("syncFromRemote success");
+            if(install) {
+                bootstrapForInstall(deferred);
+            }else{
+                bootstrap(deferred);    
+            }                                                   
+        }).catch(function(){  
+            console.log("syncFromRemote fail");
+            if(install) {
+                bootstrapForInstall(deferred, function(){
+                    syncFail();
+                })
+            }else{
+                bootstrap(deferred, function(){
+                    syncFail();
+                })
+            }
+        });   
+    }
+
+    service.init_ = function() {        
+
         var deferred = $q.defer();
     
         createDB();
@@ -672,23 +743,7 @@ angular.module('app.services', [])
             syncFromRemote().then(function(result){                                           
                 retrieveLists()
                 .then(reIndex)
-                .then(function() {                    
-                    // if(result.docs_written > 0) {
-                    //     // reIndex().then(function(){
-                    //     //     deferred.resolve("DB Existed and reindexed");
-                    //     // }).catch(function() {
-                    //     //     deferred.resolve("DB Existed but not reindexed");
-                    //     // });
-                    //     reIndex().finally(function(){
-                    //         deferred.resolve("DB Existed");
-                    //     });
-                    // }else{
-                    //     deferred.resolve("DB Existed");
-                    // }
-
-                    // reIndex().finally(function(){
-                    //     deferred.resolve("DB Existed");
-                    // });
+                .then(function() {                   
                     deferred.resolve("DB Existed");
                 }).catch(function(err){                    
                     initFail();
@@ -699,30 +754,29 @@ angular.module('app.services', [])
                 .then(reIndex)
                 .then(function() {
                     deferred.resolve("DB Existed");
-                    ErrorService.showAlert(string.network_err.title, string.network_err.desc);
+                    syncFail();
                 }).catch(function(err){                    
                     initFail();
                     deferred.reject("Err in getting init data: " + err);                     
                 });
             });            
         }).catch(function(e) {
-            console.log("Cannot find install flag due to: " + e);
+            //console.log("Cannot find install flag due to: " + e);
 
-            if(navigator.connection.type === Connection.NONE) {
-                console.log("No network connect");
+            if(isCordova() && navigator.connection.type === Connection.NONE) {
+                //console.log("No network connect");
                 installFail();
                 deferred.reject("No network connect");                            
             }else{
                 //ErrorService.showProgress();
                 cleanDB()
-                //.then(syncFromRemote)                          
-                .then(loadDBDump)
-                //.then(setUpIndex)
-                //.then(setupView)
+                //.then(loadDBDump)
+                .then(syncFromRemote)      
+                .then(setupView)
+                .then(setUpIndex)   
                 .then(retrieveListsForInstall)
-                .then(reIndex)
-                //.then(syncToRemote)
-                .then(loadImgs)            
+                .then(reIndexForInstall)
+                .then(loadImgs)          
                 .then(markInstalled)
                 .then(function() {
                     deferred.resolve("DB Created");
@@ -745,7 +799,7 @@ angular.module('app.services', [])
     }
 
     function retrieveLists(isInstall) {
-        console.log("Start to retrieveLists");
+        //console.log("Start to retrieveLists");
         var list = [];
         list.push(retrieveAllPlayers());
         list.push(retrieveAllMoves());
@@ -813,7 +867,7 @@ angular.module('app.services', [])
         return deferred.promise;        
     }
 
-    function reIndex() {        
+    function reIndex(install) {       
         
         var playerID = list.getPlayerList()[0]._id,
 
@@ -825,15 +879,51 @@ angular.module('app.services', [])
 
         promiseList.push(pagination.clips().testClips(playerID, moveID));
 
+        if(install) {
+            var search = {                    
+                    noResult: true                  
+                },
+                search1 = {
+                    player: playerID,
+                    noResult: true                  
+                },
+                search2 = {
+                    move: moveID,
+                    noResult: true
+                },
+                search3 = {
+                    player: playerID,                 
+                    move: moveID,
+                    noResult: true
+                };
+            promiseList.push(pagination.favorite().search(search));
+            promiseList.push(pagination.favorite().search(search1));
+            promiseList.push(pagination.favorite().search(search2));
+            promiseList.push(pagination.favorite().search(search3));
+        }
+
         return executePromises(promiseList);
     }
 
-    function installFail() {
-        ErrorService.showAlert("安装遇到小问题", "请确认互联网连接后重试。", true);         
+    function reIndexForInstall() {
+        console.log("Start to reIndexForInstall");
+        return reIndex(true);
     }
 
     function initFail() {
         ErrorService.showAlert("启动遇到小问题", "请重启再试。", false);         
+    }
+
+    function installFail() {
+        ErrorService.showAlert("启动遇到小问题", "请检查网络后再试。", false);         
+    }
+
+    function syncFail() {
+        if(isCordova() && navigator.connection.type === Connection.NONE) {
+            ErrorService.showAlert("无法同步最新数据", "请确认互联网连接。", false);            
+        }else{
+            ErrorService.showAlert("无法同步最新数据", "请稍候再试。", false);
+        }        
     }
 
     function retrieveFavorites() {
@@ -955,7 +1045,7 @@ angular.module('app.services', [])
     }
 
     function cleanDB() {      
-        console.log("Start to cleanDB");
+        //console.log("Start to cleanDB");
         var deferred = $q.defer();
         db.destroy().then(function() {
             createDB();
@@ -973,7 +1063,7 @@ angular.module('app.services', [])
         if(db) {
             db = null;
         }
-        console.log("Start to createDB");
+        //console.log("Start to createDB");
         db = pouchdb.create(string.dbName, {size: 40, adapter: string.dbAdapter, auto_compaction: true});
         //deleteDB();
         //db = pouchdb.create(string.dbName, {adapter: string.dbAdapter});        
@@ -986,12 +1076,13 @@ angular.module('app.services', [])
         console.log("Start to SyncFromRemote from: " + string.remoteURL + string.dbName);
         if(!db) console.log("DB is null when SyncFromRemote");
         return db.replicate.from(string.remoteURL + string.dbName, {timeout: 10000});
+        //return db.replicate.from(string.remoteURL + "cliplay", {timeout: 10000});
     }
 
     function syncToRemote() {
-        console.log("Start to syncToRemote from: " + string.remoteURL + string.dbName);
+        //console.log("Start to syncToRemote from: " + string.remoteURL + string.dbName);
         if(!db) console.log("DB is null when syncToRemote");
-        return db.replicate.to(string.remoteURL + string.dbName, {timeout: 10000});   
+        return db.replicate.to(string.remoteURL + string.dbName, {timeout: 3000});   
     }
 
     function loadDBDump() {
@@ -1000,9 +1091,37 @@ angular.module('app.services', [])
         var deferred = $q.defer();      
 
         if(isCordova()) {            
-            $.get(string.file, function(res) {                
-                deferred.resolve(db.load(res));
-            });
+            // $.get(string.file, function(res) {   
+            //     console.log("string.remoteURL + string.dbName: " + string.remoteURL + string.dbName);
+            //     deferred.resolve(db.load(res, {
+            //         proxy: string.remoteURL + string.dbName
+            //     }));
+            //     // deferred.resolve(db.load(res));
+            // });
+
+            window.resolveLocalFileSystemURL(cordova.file.applicationDirectory + "/" + string.file, 
+                function(fileEntry){
+
+                    fileEntry.file(function(file) {
+                        var reader = new FileReader();
+
+                        reader.onloadend = function(e) {
+
+                            deferred.resolve(db.load(this.result, {
+                                //proxy: string.remoteURL + string.dbName
+                            }));                            
+                        }
+
+                        reader.readAsText(file);
+                    });
+                },
+                function(e){
+                    console.log("FileSystem Error");    
+                    console.dir(e);             
+                    deferred.reject(e);
+                }                        
+            );
+
         }else{
             deferred.resolve(db.load(string.file));
         }
@@ -1015,7 +1134,7 @@ angular.module('app.services', [])
     };
 
     function setupView() {
-        console.log("Start to setupView");
+        //console.log("Start to setupView");
         var ddoc = {
             _id: '_design/views',
             views: {
@@ -1098,7 +1217,7 @@ angular.module('app.services', [])
     }    
 
     function setUpIndex() {
-        console.log("Start to setupIndex");
+        //console.log("Start to setupIndex");
     	return db.createIndex({
     		index: {
     			fields: ['type']
@@ -1107,7 +1226,7 @@ angular.module('app.services', [])
     }
     
     function markInstalled() {
-        console.log("Install finished");
+        //console.log("Install finished");
         return db.put({
             _id: '_local/DBInstalled',
             status: 'completed'

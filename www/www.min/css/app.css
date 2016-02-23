@@ -68,12 +68,44 @@ ion-tabs.tabs-color-active-assertive .tab-item.tab-item-active, .basketball{
 	text-align: center;
 	background-color: black;
 	background-repeat: no-repeat;
-	background-position: 40% 0%;
+	/*background-position: 40% 0%;*/
+	background-position: center 0%;
+}
+
+@media (min-height:480px) {
+    .box {
+    	background-size: auto 368px;
+    }
+}
+
+@media (min-height:568px) {
+    .box {
+    	background-size: auto 456px;
+    }
+}
+
+@media (min-height:627px) {
+    .box {
+    	background-size: auto 515px;
+    }
+}
+
+@media (min-height:736px) {
+    .box {
+    	background-size: auto 624px;
+    }
+}
+
+@media (min-height:1024px) {
+    .box {
+    	background-size: auto 912px;
+    }
 }
 
 .boxLoading {
 	background-image: url(../images/oval.svg) !important;	
 	background-position: 50% 50% !important;
+	background-size: auto !important;
 }
 
 image {

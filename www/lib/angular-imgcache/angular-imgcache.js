@@ -49,7 +49,6 @@ angular.module('ImgCache', [])
             var setImg = function(type, el, src) {
 
                 ImgCache.getCachedFileURL(src, function(src, dest) {
-
                     if(type === 'bg') {
                         el.css({'background-image': 'url(' + dest + ')' });
                         $(el).removeClass('boxLoading');
@@ -74,6 +73,10 @@ angular.module('ImgCache', [])
                         } else {
                             ImgCache.cacheFile(src, function() {
                                 setImg(type, el, src);
+                            }, function() {
+                                //el.css({'background-image': 'url(images/back.jpg)' });
+                                $(el).addClass('default');
+                                $(el).removeClass('boxLoading');                                
                             });
                         }
 

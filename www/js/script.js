@@ -197,8 +197,9 @@ angular.module('app.services', [])
     var service = {};    
 
     var string = {
-        dbName: "cliplay",
-        remoteURL: dbString? dbString: "http://admin:12341234@localhost:5984/",        
+        dbName: "cliplay",        
+        remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",        
+        file: dbString? dbString.split(",")[1]: "db.txt",
         dbAdapter: "websql",
         network_err: {
             title: "无法获取最新数据",
@@ -338,8 +339,9 @@ angular.module('app.services', [])
 
         getMovesByPlayer: function(playerID) {
             var deferred = $q.defer();
+            var option = {startkey: [playerID], endkey: [playerID, {}], reduce: true, group: true};
             
-            db.query('views/moves', {startkey: [playerID], endkey: [playerID, {}], reduce: true, group: true}).then(function (result) {
+            db.query('views/moves', option).then(function (result) {
                           
                 var moves = [];
 
@@ -354,6 +356,17 @@ angular.module('app.services', [])
 
             return deferred.promise;       
         },
+
+        testMovesByPlayer: function(playerID) {
+            var deferred = $q.defer();
+            var option = {startkey: [playerID], endkey: [playerID, {}], reduce: true, group: true, limit: 0};
+            
+            db.query('views/moves', option).finally(function() {
+                deferred.resolve("move retrieved");
+            }); 
+
+            return deferred.promise;       
+        },        
     };      
 
     var pagination = {       
@@ -372,7 +385,7 @@ angular.module('app.services', [])
             limit: isPad? 12: 7,    
             descending: true,           
             init: function(playerID, moveID) {
-                this.options = {descending : this.descending, limit : this.limit, endkey: [playerID, moveID], startkey: [playerID, moveID, {}], reduce: true, group: true};                
+                this.options = {descending : this.descending, limit : this.limit, endkey: [playerID, moveID], startkey: [playerID, moveID, {}], reduce: true, group: true};                                
                 list.resetClipList();
                 this.end.noMore = true;
                 return this.getClips();
@@ -456,6 +469,26 @@ angular.module('app.services', [])
 
                 return deferred.promise;
             },
+
+            testClips: function(playerID, moveID) {
+
+                var deferred = $q.defer();
+
+                var options = {descending: true, limit: 1, endkey: [playerID, moveID], startkey: [playerID, moveID, {}], reduce: true, group: true};                
+             
+                db.query('views/clips', options).then(function (result) {
+                    
+                    db.query('views/local', {include_docs : true, key: result.rows[0].value})
+                    .finally(function () {
+                        deferred.resolve("data fetched");
+                    });
+
+                }).catch(function (err) {
+                    deferred.resolve("data not fetched");
+                });
+
+                return deferred.promise;
+            }
         },
 
         favoritePg: {
@@ -494,10 +527,13 @@ angular.module('app.services', [])
                     this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true], startkey: [true, {}]};    
                 }
 
+                if(search.noResult) this.options.limit = 0;
+
                 this.end.noMore = true;
 
                 this.more(callback);                             
-            },            
+            },      
+
             more: function(callback) {              
                 this.getFavorite()
                 .catch(function() {
@@ -570,7 +606,7 @@ angular.module('app.services', [])
                 });
 
                 return deferred.promise;
-            }  
+            }
         }
     };
 
@@ -578,13 +614,18 @@ angular.module('app.services', [])
         syncRemote: function(callback) {
             syncFromRemote().then(function(result) {
                 if(result.docs_written > 0) {
-                    retrieveAllPlayers();
-                    retrieveAllMoves();
-                }                
+                    //retrieveAllPlayers();
+                    //retrieveAllMoves();
+                    //verifyView();
+                    reIndex().then(refreshAllPlayers).finally(function(){
+                        if(callback) callback();        
+                    });
+                }else{                    
+                    if(callback) callback();
+                }
             }).catch(function(err) {
-                ErrorService.showAlert('无法同步数据', '请确认互联网连接。');
-            }).finally(function(){
                 if(callback) callback();
+                ErrorService.showAlert('无法同步数据', '请确认互联网连接。');
             });
         },    
 
@@ -810,15 +851,17 @@ angular.module('app.services', [])
     };
 
     service.init = function() {        
+
         var deferred = $q.defer();
-        
+    
         createDB();
         
         isDBInstalled()
         .then(function() {
-            syncFromRemote().then(function(){                                           
+            syncFromRemote().then(function(result){                                           
                 retrieveLists()
-                .then(function() {
+                .then(reIndex)
+                .then(function() {                   
                     deferred.resolve("DB Existed");
                 }).catch(function(err){                    
                     initFail();
@@ -826,6 +869,7 @@ angular.module('app.services', [])
                 });
             }).catch(function(){                                   
                 retrieveLists()
+                .then(reIndex)
                 .then(function() {
                     deferred.resolve("DB Existed");
                     ErrorService.showAlert(string.network_err.title, string.network_err.desc);
@@ -834,46 +878,57 @@ angular.module('app.services', [])
                     deferred.reject("Err in getting init data: " + err);                     
                 });
             });            
-        }).catch(function() {
-            ErrorService.showProgress();
-            cleanDB()
-            .then(syncFromRemote)              
-            //.then(setupIndexes)
-            .then(setUpIndex)
-            .then(setupView)
-            .then(retrieveLists)           
-            .then(verifyView)
-            .then(loadImgs)
-            .then(markInstalled)    
-            .then(function() {
-                deferred.resolve("DB Created");
-            }).catch(function (err){                
-                console.log("install err, details = " + err);
-                initFail();
-                deferred.reject("Err in creating DB" + err);                            
-            });
+        }).catch(function(e) {
+            //console.log("Cannot find install flag due to: " + e);
+
+            if(isCordova() && navigator.connection.type === Connection.NONE) {
+                //console.log("No network connect");
+                installFail();
+                deferred.reject("No network connect");                            
+            }else{
+                //ErrorService.showProgress();
+                cleanDB()
+                .then(loadDBDump)
+                .then(syncFromRemote)            
+                .then(retrieveListsForInstall)
+                .then(reIndex)
+                .then(loadImgs)            
+                .then(markInstalled)
+                .then(function() {
+                    deferred.resolve("DB Created");
+                }).catch(function (err){                
+                    console.log("install err, details = " + err);
+                    installFail();
+                    deferred.reject("Err in creating DB" + err);                            
+                });      
+            }
         });
-      
+
         return deferred.promise;        
     };
 
-    function setupIndexes() {
+    function setupIndexes() {        
         var list = [];
         list.push(setupView());
         list.push(setUpIndex());
         return executePromises(list);
     }
 
-    function retrieveLists() {
-        //console.log("Ready for retrieveLists");
+    function retrieveLists(isInstall) {
+        //console.log("Start to retrieveLists");
         var list = [];
         list.push(retrieveAllPlayers());
         list.push(retrieveAllMoves());
-        list.push(retrieveFavorites());
+        if(!isInstall) list.push(retrieveFavorites());
         return executePromises(list);
-    }    
+    }
+
+    function retrieveListsForInstall(){
+        return retrieveLists(true);
+    }   
 
     function loadImgs() {
+        //console.log("Start to loadPlayerImg");
         var list = [];
         list.push(loadMoveImg());
         list.push(loadPlayerImg());        
@@ -900,8 +955,8 @@ angular.module('app.services', [])
         return $q.all(promises);
     }
     
-    function verifyView() {
-        //console.log("ready for verifyView");
+    function verifyView() {        
+        //console.log("Start to verifyView");
         var deferred = $q.defer();      
 
         var playerID = list.getPlayerList()[0]._id;    
@@ -928,8 +983,27 @@ angular.module('app.services', [])
         return deferred.promise;        
     }
 
-    function initFail() {
+    function reIndex() {        
+        
+        var playerID = list.getPlayerList()[0]._id,
+
+            moveID = list.getMoveList()[1]._id,
+
+            promiseList = [];
+
+        promiseList.push(dataFetcher.testMovesByPlayer(playerID));       
+
+        promiseList.push(pagination.clips().testClips(playerID, moveID));
+
+        return executePromises(promiseList);
+    }
+
+    function installFail() {
         ErrorService.showAlert("安装遇到小问题", "请确认互联网连接后重试。", true);         
+    }
+
+    function initFail() {
+        ErrorService.showAlert("启动遇到小问题", "请重启再试。", false);         
     }
 
     function retrieveFavorites() {
@@ -983,6 +1057,57 @@ angular.module('app.services', [])
         return deferred.promise;
     }
 
+    function refreshAllPlayers() {
+
+        var deferred = $q.defer();
+
+        db.query('views/players', {reduce: true, group: true, group_level: 2}).then(function (result) {            
+            
+            var keys = [], qtys = [];
+            var players = list.playerList;
+            
+            for(i in result.rows) {
+                
+                var index = findIndex(players, result.rows[i].key);    
+
+                if(index == -1) {
+                    keys.push(result.rows[i].key);
+                    qtys.push(result.rows[i].value);                
+                } else {
+                    if(players[index].clipQty != result.rows[i].value) {
+                        players[index].clipQty = result.rows[i].value;
+                    }    
+                }             
+            }
+
+            if (keys.length > 0) {
+                db.allDocs({
+                    include_docs: true,
+                    keys: keys
+                }).then(function (result) {
+                                    
+                    for(i in result.rows) {
+                        result.rows[i].doc.clipQty = qtys[i];
+                        insertArray(players, result.rows[i].doc);
+                    }
+
+                    deferred.resolve("All players refreshed");
+
+                }).catch(function (err) {
+                    deferred.reject(err);
+                });
+
+            }else {
+                deferred.resolve("All players refreshed");
+            }
+
+        }).catch(function (err) {
+            deferred.reject(err);
+        });
+
+        return deferred.promise;
+    }
+
     function copyList(desc, source) {
         desc.push.apply(desc, source);
     }
@@ -1000,12 +1125,14 @@ angular.module('app.services', [])
     }
 
     function cleanDB() {      
+        //console.log("Start to cleanDB");
         var deferred = $q.defer();
         db.destroy().then(function() {
             createDB();
-            $timeout(function(){
-                deferred.resolve("DB recreated");
-            },10);         
+            deferred.resolve("DB recreated");
+            // $timeout(function(){
+            //     deferred.resolve("DB recreated");
+            // },10);         
         }).catch(function() {
             deferred.reject("DB destroy err");
         });
@@ -1016,15 +1143,77 @@ angular.module('app.services', [])
         if(db) {
             db = null;
         }
+        //console.log("Start to createDB");
         db = pouchdb.create(string.dbName, {size: 40, adapter: string.dbAdapter, auto_compaction: true});
+        //deleteDB();
+        //db = pouchdb.create(string.dbName, {adapter: string.dbAdapter});        
+        //db = pouchdb.create(string.dbName, {size: 40, adapter: string.dbAdapter, auto_compaction: false});
+        //db = pouchdb.create(string.dbName, {auto_compaction: true});
+        //db.info().then(console.log.bind(console));
     }
 
     function syncFromRemote() {
-        //console.log("ready for syncFromRemote");
-        return db.replicate.from(string.remoteURL + string.dbName);
+        //console.log("Start to SyncFromRemote from: " + string.remoteURL + string.dbName);
+        if(!db) console.log("DB is null when SyncFromRemote");
+        return db.replicate.from(string.remoteURL + string.dbName, {timeout: 10000});
     }
 
+    function syncToRemote() {
+        //console.log("Start to syncToRemote from: " + string.remoteURL + string.dbName);
+        if(!db) console.log("DB is null when syncToRemote");
+        return db.replicate.to(string.remoteURL + string.dbName, {timeout: 3000});   
+    }
+
+    function loadDBDump() {
+        //console.log("Start to loadDBDump");
+        
+        var deferred = $q.defer();      
+
+        if(isCordova()) {            
+            // $.get(string.file, function(res) {   
+            //     console.log("string.remoteURL + string.dbName: " + string.remoteURL + string.dbName);
+            //     deferred.resolve(db.load(res, {
+            //         proxy: string.remoteURL + string.dbName
+            //     }));
+            //     // deferred.resolve(db.load(res));
+            // });
+
+            window.resolveLocalFileSystemURL(cordova.file.applicationDirectory + "/" + string.file, 
+                function(fileEntry){
+
+                    fileEntry.file(function(file) {
+                        var reader = new FileReader();
+
+                        reader.onloadend = function(e) {
+
+                            deferred.resolve(db.load(this.result, {
+                                proxy: string.remoteURL + string.dbName
+                            }));                            
+                        }
+
+                        reader.readAsText(file);
+                    });
+                },
+                function(e){
+                    console.log("FileSystem Error");    
+                    console.dir(e);             
+                    deferred.reject(e);
+                }                        
+            );
+
+        }else{
+            deferred.resolve(db.load(string.file));
+        }
+
+        return deferred.promise;
+    }
+
+    function isCordova() {
+        return (typeof cordova !== 'undefined' || typeof phonegap !== 'undefined');
+    };
+
     function setupView() {
+        //console.log("Start to setupView");
         var ddoc = {
             _id: '_design/views',
             views: {
@@ -1107,6 +1296,7 @@ angular.module('app.services', [])
     }    
 
     function setUpIndex() {
+        //console.log("Start to setupIndex");
     	return db.createIndex({
     		index: {
     			fields: ['type']
@@ -1117,13 +1307,37 @@ angular.module('app.services', [])
     function markInstalled() {
         //console.log("Install finished");
         return db.put({
-            _id: 'DBInstalled',
+            _id: '_local/DBInstalled',
             status: 'completed'
         });
     }
 
     function isDBInstalled() {
-        return db.get('DBInstalled');
+        return db.get('_local/DBInstalled');
+    }
+
+    function findIndex(array, id) {  
+        var low = 0, high = array.length, mid;
+        while (low < high) {
+            mid = (low + high) >>> 1;
+            if(array[mid]._id == id) {
+                return mid;
+            }else{
+                array[mid]._id < id ? low = mid + 1 : high = mid    
+            }
+        }
+        return -1;
+    }
+
+    function insertArray(array, obj) {
+        var i = array.length - 1;
+        while (i >= 0) {
+           if(obj._id > array[i]._id){
+              array.splice(i+1, 0, obj);
+              break;
+           }
+           i--;
+        }
     }
 
     return service;    
@@ -1260,8 +1474,31 @@ angular.module('app.services', [])
 })
 
 .factory('ErrorService', ['$rootScope', '$cordovaSplashscreen', '$ionicPopup', '$ionicLoading', '$timeout', 'NativeService', function($rootScope, $cordovaSplashscreen, $ionicPopup, $ionicLoading, $timeout, NativeService) {
-                         
-    var service = {};            
+                
+         
+    var service = {};
+                
+    // $ionicModal.fromTemplateUrl('templates/modal.html', {
+    //     scope: $rootScope,
+    //     animation: 'slide-in-up',
+    //     backdropClickToClose: false,
+    //     hardwareBackButtonClose: false
+    // }).then(function(modal) {
+    //     $rootScope.modal = modal;
+    // });
+
+    // service.showModal = function() {
+    //     if(!$rootScope.modal.isShown()){
+    //         $rootScope.modal.show();    
+    //     }        
+    // };
+
+    // service.hideModal = function() {
+    //     if($rootScope.modal.isShown()) {
+    //         $rootScope.modal.hide();
+    //         $rootScope.modal.remove();    
+    //     }
+    // };
 
     service.showSplashScreen = function() {
         $cordovaSplashscreen.show();

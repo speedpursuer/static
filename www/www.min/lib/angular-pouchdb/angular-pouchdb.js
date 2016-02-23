@@ -133,6 +133,7 @@
               find: qify(db.find.bind(db)),
               on: qify(db.on.bind(db)),
               viewCleanup: qify(db.viewCleanup.bind(db)),
+              load: qify(db.load.bind(db)),
             };
           }
         };

@@ -25,11 +25,11 @@ angular.module('app.routes', [])
         
     .state('tabsController.stars', {
       url: '/stars',
-      resolve: {
-        stars: ['DBService', 'init', function(DBService, init) {
-          return DBService.dataFetcher().getStars();
-        }]
-      },
+      // resolve: {
+      //   stars: ['DBService', 'init', function(DBService, init) {
+      //     return DBService.dataFetcher().getStars();
+      //   }]
+      // },
       views: {
         'tab1': {
           templateUrl: 'templates/stars.html',

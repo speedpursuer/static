@@ -23,18 +23,23 @@ angular.module('app.controllers', [])
   }
 }])
 
-.controller('StarsCtrl', ['$scope', '$ionicSlideBoxDelegate', '$state', 'ErrorService', 'stars', function($scope, $ionicSlideBoxDelegate, $state, ErrorService, stars) {
+.controller('StarsCtrl', ['$scope', '$ionicSlideBoxDelegate', '$state', 'ErrorService', 'DBService', function($scope, $ionicSlideBoxDelegate, $state, ErrorService, DBService) {
   	
-	(function() {
-		renderPlayList(stars);		
-	}());	  
+	// (function() {
+	// 	renderPlayList(stars);		
+	// }());	  
 
- 	function renderPlayList(results) {
- 		$scope.stars = results.docs;
-		$ionicSlideBoxDelegate.update();
-		$ionicSlideBoxDelegate.slide(0);					
-		ErrorService.hideSplashScreen();
- 	}
+ 	// function renderPlayList(results) {
+ 	// 	$scope.stars = results;
+		// $ionicSlideBoxDelegate.update();
+		// $ionicSlideBoxDelegate.slide(0);					
+		// ErrorService.hideSplashScreen();
+ 	// }
+
+ 	$scope.stars = DBService.list().getStarList();
+	$ionicSlideBoxDelegate.update();
+	$ionicSlideBoxDelegate.slide(0);					
+	ErrorService.hideSplashScreen();
 
  	$scope.showMoves = function(playerID, playerName) {
 		$state.go("tabsController.moves", {playerID: playerID, playerName: playerName});
@@ -186,7 +191,8 @@ angular.module('app.controllers', [])
 	
 	$scope.players = DBService.list().getPlayerList();
 
-	$scope.doRefresh = function() {		
+	$scope.doRefresh = function() {
+		console.log("start to doRefresh");
 		DBService.remoteDB().syncRemote(function() {
 			$scope.$broadcast('scroll.refreshComplete');
 		});

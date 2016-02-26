@@ -197,14 +197,10 @@ angular.module('app.services', [])
     var service = {};    
 
     var string = {
-        dbName: "cliplay",        
+        dbName: "cliplay",     
         remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",        
         file: dbString? dbString.split(",")[1]: "db.txt",
-        dbAdapter: "websql",
-        network_err: {
-            title: "无法获取最新数据",
-            desc: "没有可使用的互联网连接。"
-        }
+        dbAdapter: "websql"
     }
     
     var db = null;
@@ -509,9 +505,7 @@ angular.module('app.services', [])
             },
             search: function(search, callback) {
 
-                if(!search) search = {};
-
-                list.resetFavoriteList();
+                if(!search) search = {};                
 
                 if(search.player && search.move) {
                     this.view = "favorite_player_move";                   
@@ -527,13 +521,19 @@ angular.module('app.services', [])
                     this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true], startkey: [true, {}]};    
                 }
 
-                if(search.noResult) this.options.limit = 0;
+                if(search.noResult) {
+                    this.options.limit = 0;
+                }else {
+                    list.resetFavoriteList();
+                }
 
                 this.end.noMore = true;
 
                 this.more(callback);                             
-            },      
-
+            },   
+            testFavorite: function() {
+                //this.search()
+            },
             more: function(callback) {              
                 this.getFavorite()
                 .catch(function() {
@@ -625,7 +625,7 @@ angular.module('app.services', [])
                 }
             }).catch(function(err) {
                 if(callback) callback();
-                ErrorService.showAlert('无法同步数据', '请确认互联网连接。');
+                syncFail();
             });
         },    
 
@@ -857,6 +857,79 @@ angular.module('app.services', [])
         createDB();
         
         isDBInstalled()
+        .then(function() {        
+            syncData(deferred, false);
+        }).catch(function(e) {
+            cleanDB()
+            .then(loadDBDump)
+            .then(markInstalled)
+            .then(function() {
+                //console.log("DB installed");
+                syncData(deferred, true);
+            }).catch(function (err){                
+                console.log("install err, details = " + err);
+                initFail();
+                deferred.reject("Err in creating DB" + err);                            
+            });
+        });
+
+        return deferred.promise;        
+    };
+
+    function bootstrap(deferred, callback) {       
+        retrieveLists()
+        .then(reIndex)
+        .then(function() {                   
+            deferred.resolve("data prefetched");
+            if(callback) callback();
+        }).catch(function(err){                    
+            initFail();
+            deferred.reject("Err in getting init data: " + err);                     
+        });
+    }
+
+    function bootstrapForInstall(deferred, callback) {       
+        retrieveListsForInstall()
+        .then(reIndexForInstall)
+        .then(loadImgs)
+        .then(function() {                 
+            deferred.resolve("data prefetched");
+            if(callback) callback();
+        }).catch(function(err){                    
+            initFail();
+            deferred.reject("Err in getting init data: " + err);                     
+        });
+    }
+
+    function syncData(deferred, install) {
+        syncFromRemote().then(function(result){
+            //console.log("syncFromRemote success");
+            if(install) {
+                bootstrapForInstall(deferred);
+            }else{
+                bootstrap(deferred);    
+            }                                                   
+        }).catch(function(){  
+            //console.log("syncFromRemote fail");
+            if(install) {
+                bootstrapForInstall(deferred, function(){
+                    syncFail();
+                })
+            }else{
+                bootstrap(deferred, function(){
+                    syncFail();
+                })
+            }
+        });   
+    }
+
+    service.init_ = function() {        
+
+        var deferred = $q.defer();
+    
+        createDB();
+        
+        isDBInstalled()
         .then(function() {
             syncFromRemote().then(function(result){                                           
                 retrieveLists()
@@ -872,7 +945,7 @@ angular.module('app.services', [])
                 .then(reIndex)
                 .then(function() {
                     deferred.resolve("DB Existed");
-                    ErrorService.showAlert(string.network_err.title, string.network_err.desc);
+                    syncFail();
                 }).catch(function(err){                    
                     initFail();
                     deferred.reject("Err in getting init data: " + err);                     
@@ -888,11 +961,13 @@ angular.module('app.services', [])
             }else{
                 //ErrorService.showProgress();
                 cleanDB()
-                .then(loadDBDump)
-                .then(syncFromRemote)            
+                //.then(loadDBDump)
+                .then(syncFromRemote)      
+                .then(setupView)
+                .then(setUpIndex)   
                 .then(retrieveListsForInstall)
-                .then(reIndex)
-                .then(loadImgs)            
+                .then(reIndexForInstall)
+                .then(loadImgs)          
                 .then(markInstalled)
                 .then(function() {
                     deferred.resolve("DB Created");
@@ -983,7 +1058,7 @@ angular.module('app.services', [])
         return deferred.promise;        
     }
 
-    function reIndex() {        
+    function reIndex(install) {       
         
         var playerID = list.getPlayerList()[0]._id,
 
@@ -995,15 +1070,51 @@ angular.module('app.services', [])
 
         promiseList.push(pagination.clips().testClips(playerID, moveID));
 
+        if(install) {
+            var search = {                    
+                    noResult: true                  
+                },
+                search1 = {
+                    player: playerID,
+                    noResult: true                  
+                },
+                search2 = {
+                    move: moveID,
+                    noResult: true
+                },
+                search3 = {
+                    player: playerID,                 
+                    move: moveID,
+                    noResult: true
+                };
+            promiseList.push(pagination.favorite().search(search));
+            promiseList.push(pagination.favorite().search(search1));
+            promiseList.push(pagination.favorite().search(search2));
+            promiseList.push(pagination.favorite().search(search3));
+        }
+
         return executePromises(promiseList);
     }
 
-    function installFail() {
-        ErrorService.showAlert("安装遇到小问题", "请确认互联网连接后重试。", true);         
+    function reIndexForInstall() {
+        //console.log("Start to reIndexForInstall");
+        return reIndex(true);
     }
 
     function initFail() {
         ErrorService.showAlert("启动遇到小问题", "请重启再试。", false);         
+    }
+
+    function installFail() {
+        ErrorService.showAlert("启动遇到小问题", "请检查网络后再试。", false);         
+    }
+
+    function syncFail() {
+        if(isCordova() && navigator.connection.type === Connection.NONE) {
+            ErrorService.showAlert("无法同步最新数据", "请确认互联网连接。", false);            
+        }else{
+            ErrorService.showAlert("无法同步最新数据", "请稍候再试。", false);
+        }        
     }
 
     function retrieveFavorites() {
@@ -1153,14 +1264,12 @@ angular.module('app.services', [])
     }
 
     function syncFromRemote() {
-        //console.log("Start to SyncFromRemote from: " + string.remoteURL + string.dbName);
-        if(!db) console.log("DB is null when SyncFromRemote");
+        //console.log("Start to SyncFromRemote from: " + string.remoteURL + string.dbName);        
         return db.replicate.from(string.remoteURL + string.dbName, {timeout: 10000});
     }
 
     function syncToRemote() {
         //console.log("Start to syncToRemote from: " + string.remoteURL + string.dbName);
-        if(!db) console.log("DB is null when syncToRemote");
         return db.replicate.to(string.remoteURL + string.dbName, {timeout: 3000});   
     }
 
@@ -1187,7 +1296,7 @@ angular.module('app.services', [])
                         reader.onloadend = function(e) {
 
                             deferred.resolve(db.load(this.result, {
-                                proxy: string.remoteURL + string.dbName
+                                //proxy: string.remoteURL + string.dbName
                             }));                            
                         }
 

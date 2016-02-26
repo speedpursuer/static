@@ -108,17 +108,12 @@ ion-tabs.tabs-color-active-assertive .tab-item.tab-item-active, .basketball{
 	background-size: auto !important;
 }
 
-image {
-	height: 100%;
+.default {
+  background-image: url(../images/back.jpg) !important; 
 }
 
-.slide-label {
-	display: table-cell;
-	vertical-align: middle;
-	color: white;
-	line-height: 1;
-	font-size: 48px;
-	font-weight: bold;
+image {
+	height: 100%;
 }
 
 .slider {
@@ -126,12 +121,16 @@ image {
 }
 
 .box h1 {
-	display: table-cell;
-	vertical-align: middle;
-	color: #FFF;
-	line-height: 1;
-	font-size: 48px;
-	font-weight: bold;
+	display: none;
+}
+
+.default h1 {
+  display: table-cell;
+  vertical-align: middle;
+  color: #FFF;
+  line-height: 1;
+  font-size: 48px;
+  font-weight: bold;
 }
 
 .hidden {

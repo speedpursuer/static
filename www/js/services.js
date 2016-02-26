@@ -7,9 +7,10 @@ angular.module('app.services', [])
 
     var string = {
         dbName: "cliplay",     
-        remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",        
+        remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",
         file: dbString? dbString.split(",")[1]: "db.txt",
-        dbAdapter: "websql"
+        dbAdapter: "websql",
+        installFail: false
     }
     
     var db = null;
@@ -41,6 +42,11 @@ angular.module('app.services', [])
         playerList: [],
         moveList: [],
         clipList: [],
+        starList: [],
+
+        getStarList: function(){
+            return this.starList;
+        },
 
         setClipList: function(_list) {                 
             copyList(this.clipList, _list);
@@ -108,7 +114,7 @@ angular.module('app.services', [])
             }
         },
 
-        getMoves: function() {
+        getMoves_: function() {
             return db.find({
                 selector: {type: 'move'}
             });        
@@ -120,19 +126,69 @@ angular.module('app.services', [])
     };
 
     var dataFetcher = {
+
         getStars: function() {
+            console.log("start to getStars");
+            return $q(function(resolve, reject) {
+                db.query('star').then(function(result){
+                    result = result.rows.map(function(row) {                   
+                        return {
+                            _id: row.id,
+                            name: row.value.name,                      
+                            image: row.value.image,                       
+                        };
+                    });
+                    console.log("finished to getStars");
+                    resolve(result);
+                }).catch(function(e) {
+                    reject(e);
+                });            
+            });
+            //return db.query('views/star', {startkey: true, include_docs: true});
+        },
+
+        getStars_: function() {
             return db.find({
                 selector: {type: 'player', star: true}
             });        
         },
 
         getMoves: function() {
+
+            console.log("start to getMoves");
+            var deferred = $q.defer();
+
+            db.query('allMoves').then(function(result){
+                console.log("finished to getMoves");
+
+                result = result.rows.map(function(row) {                   
+                    return {
+                        _id: row.id,
+                        move_name: row.value.name,                        
+                        image: row.value.image,                        
+                    };
+                });
+
+                list.setMoveList(result);
+                deferred.resolve("Moves retrieved");
+            }).catch(function(e){
+                console.log(e);
+                deferred.reject("Moves not retrieved");
+            });
+
+            return deferred.promise;
+        },
+
+        getMoves_: function() {
+
+            console.log("start to getMoves");
             var deferred = $q.defer();
 
             db.find({
                 selector: {type: 'move'},
                 fields: ['_id', 'move_name', 'image']
             }).then(function(result){
+                console.log("finished to getMoves");
                 list.setMoveList(result.docs);
                 deferred.resolve("Moves retrieved");
             }).catch(function(){
@@ -146,7 +202,7 @@ angular.module('app.services', [])
             var deferred = $q.defer();
             var option = {startkey: [playerID], endkey: [playerID, {}], reduce: true, group: true};
             
-            db.query('views/moves', option).then(function (result) {
+            db.query('moves', option).then(function (result) {
                           
                 var moves = [];
 
@@ -163,10 +219,12 @@ angular.module('app.services', [])
         },
 
         testMovesByPlayer: function(playerID) {
+            console.log("start to testMovesByPlayer");
             var deferred = $q.defer();
             var option = {startkey: [playerID], endkey: [playerID, {}], reduce: true, group: true, limit: 0};
             
-            db.query('views/moves', option).finally(function() {
+            db.query('moves', option).finally(function() {
+                console.log("finished to testMovesByPlayer");
                 deferred.resolve("move retrieved");
             }); 
 
@@ -217,7 +275,7 @@ angular.module('app.services', [])
 
                 var _options = that.options;
              
-                db.query('views/clips', _options).then(function (result) {
+                db.query('clips', _options).then(function (result) {
 
                     if (result && result.rows.length > 0) {
 
@@ -230,7 +288,7 @@ angular.module('app.services', [])
                             keys.push(result.rows[i].value);
                         }
 
-                        db.query('views/local', {include_docs : true, keys: keys}).then(function (result) {
+                        db.query('local', {include_docs : true, keys: keys}).then(function (result) {
                                                            
                             result = result.rows.map(function(row) {
                                 var thumb = "", favorite = false;
@@ -277,14 +335,17 @@ angular.module('app.services', [])
 
             testClips: function(playerID, moveID) {
 
+                console.log("start to testClips");
+
                 var deferred = $q.defer();
 
                 var options = {descending: true, limit: 1, endkey: [playerID, moveID], startkey: [playerID, moveID, {}], reduce: true, group: true};                
              
-                db.query('views/clips', options).then(function (result) {
+                db.query('clips', options).then(function (result) {
                     
-                    db.query('views/local', {include_docs : true, key: result.rows[0].value})
+                    db.query('local', {key: result.rows[0].value, limit: 0})
                     .finally(function () {
+                        console.log("finished to testClips");
                         deferred.resolve("data fetched");
                     });
 
@@ -314,20 +375,30 @@ angular.module('app.services', [])
             },
             search: function(search, callback) {
 
-                if(!search) search = {};                
+                if(!search) search = {};          
+
+                this.options = {descending : this.descending, limit : this.limit, include_docs: true};                
 
                 if(search.player && search.move) {
                     this.view = "favorite_player_move";                   
-                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true, search.player, search.move], startkey: [true, search.player, search.move, {}]};                
+                    //this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true, search.player, search.move], startkey: [true, search.player, search.move, {}]};                
+                    this.options.startkey = [true, search.player, search.move, {}];
+                    this.options.endkey = [true, search.player, search.move];
                 }else if(search.player) {
                     this.view = "favorite_player";
-                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true, search.player], startkey: [true, search.player, {}]};                
+                    //this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true, search.player], startkey: [true, search.player, {}]};                
+                    this.options.startkey = [true, search.player, {}];
+                    this.options.endkey = [true, search.player];
                 }else if(search.move) {
                     this.view = "favorite_move";
-                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true, search.move], startkey: [true, search.move, {}]};
+                    //this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true, search.move], startkey: [true, search.move, {}]};
+                    this.options.startkey = [true, search.move, {}];
+                    this.options.endkey = [true, search.move];
                 }else {
                     this.view = "favorite";
-                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true], startkey: [true, {}]};    
+                    //this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true], startkey: [true, {}]};    
+                    this.options.startkey = [true, {}];
+                    this.options.endkey = [true];
                 }
 
                 if(search.noResult) {
@@ -369,7 +440,7 @@ angular.module('app.services', [])
 
                 var _options = that.options;
 
-                db.query('views/' + that.view, _options).then(function (result) {
+                db.query(that.view, _options).then(function (result) {
 
                     if (result && result.rows.length > 0) {
 
@@ -426,9 +497,14 @@ angular.module('app.services', [])
                     //retrieveAllPlayers();
                     //retrieveAllMoves();
                     //verifyView();
-                    reIndex().then(refreshAllPlayers).finally(function(){
+                    reBootstrap().finally(function(){
+                        console.log("finished refresh");
                         if(callback) callback();        
                     });
+                    // reIndex().then(refreshAllPlayers).finally(function(){
+                    //     console.log("finished refresh");
+                    //     if(callback) callback();        
+                    // });
                 }else{                    
                     if(callback) callback();
                 }
@@ -660,23 +736,26 @@ angular.module('app.services', [])
     };
 
     service.init = function() {        
-
+        console.log("start to init");
         var deferred = $q.defer();
-    
+
         createDB();
+        //generateDump(); return;
         
         isDBInstalled()
         .then(function() {        
             syncData(deferred, false);
         }).catch(function(e) {
+            ErrorService.showProgress();          
             cleanDB()
             .then(loadDBDump)
             .then(markInstalled)
             .then(function() {
-                console.log("DB installed");
+                //console.log("DB installed");                
                 syncData(deferred, true);
             }).catch(function (err){                
                 console.log("install err, details = " + err);
+                string.installFail = true;
                 initFail();
                 deferred.reject("Err in creating DB" + err);                            
             });
@@ -685,41 +764,17 @@ angular.module('app.services', [])
         return deferred.promise;        
     };
 
-    function bootstrap(deferred, callback) {       
-        retrieveLists()
-        .then(reIndex)
-        .then(function() {                   
-            deferred.resolve("data prefetched");
-            if(callback) callback();
-        }).catch(function(err){                    
-            initFail();
-            deferred.reject("Err in getting init data: " + err);                     
-        });
-    }
-
-    function bootstrapForInstall(deferred, callback) {       
-        retrieveListsForInstall()
-        .then(reIndexForInstall)
-        .then(loadImgs)
-        .then(function() {                 
-            deferred.resolve("data prefetched");
-            if(callback) callback();
-        }).catch(function(err){                    
-            initFail();
-            deferred.reject("Err in getting init data: " + err);                     
-        });
-    }
-
     function syncData(deferred, install) {
+        console.log("start to syncData");
         syncFromRemote().then(function(result){
-            console.log("syncFromRemote success");
+            console.log("finished to syncFromRemote");
             if(install) {
                 bootstrapForInstall(deferred);
             }else{
                 bootstrap(deferred);    
             }                                                   
         }).catch(function(){  
-            console.log("syncFromRemote fail");
+            //console.log("syncFromRemote fail");
             if(install) {
                 bootstrapForInstall(deferred, function(){
                     syncFail();
@@ -732,64 +787,99 @@ angular.module('app.services', [])
         });   
     }
 
-    service.init_ = function() {        
-
-        var deferred = $q.defer();
-    
-        createDB();
-        
-        isDBInstalled()
-        .then(function() {
-            syncFromRemote().then(function(result){                                           
-                retrieveLists()
-                .then(reIndex)
-                .then(function() {                   
-                    deferred.resolve("DB Existed");
-                }).catch(function(err){                    
-                    initFail();
-                    deferred.reject("Err in getting init data: " + err);                     
-                });
-            }).catch(function(){                                   
-                retrieveLists()
-                .then(reIndex)
-                .then(function() {
-                    deferred.resolve("DB Existed");
-                    syncFail();
-                }).catch(function(err){                    
-                    initFail();
-                    deferred.reject("Err in getting init data: " + err);                     
-                });
-            });            
-        }).catch(function(e) {
-            //console.log("Cannot find install flag due to: " + e);
-
-            if(isCordova() && navigator.connection.type === Connection.NONE) {
-                //console.log("No network connect");
-                installFail();
-                deferred.reject("No network connect");                            
-            }else{
-                //ErrorService.showProgress();
-                cleanDB()
-                //.then(loadDBDump)
-                .then(syncFromRemote)      
-                .then(setupView)
-                .then(setUpIndex)   
-                .then(retrieveListsForInstall)
-                .then(reIndexForInstall)
-                .then(loadImgs)          
-                .then(markInstalled)
-                .then(function() {
-                    deferred.resolve("DB Created");
-                }).catch(function (err){                
-                    console.log("install err, details = " + err);
-                    installFail();
-                    deferred.reject("Err in creating DB" + err);                            
-                });      
-            }
+    function bootstrap(deferred, callback) {       
+        retrieveLists()
+        //.then(reIndex)
+        .then(buildIndexes)
+        .then(function() {                   
+            deferred.resolve("data prefetched");
+            if(callback) callback();
+        }).catch(function(err){                    
+            initFail();
+            deferred.reject("Err in getting init data: " + err);                     
         });
+    }
 
-        return deferred.promise;        
-    };
+    function bootstrapForInstall(deferred, callback) {     
+        
+        retrieveListsForInstall()                
+        .then(buildIndexesForInstall)
+        .then(loadImgs)
+        .then(function() {                 
+            deferred.resolve("data prefetched");
+            if(callback) callback();
+        }).catch(function(err){                    
+            initFail();
+            deferred.reject("Err in getting init data: " + err);                     
+        });
+    }
+
+    function reBootstrap() {
+        var list = [];
+        list.push(refreshAllPlayers());
+        list.push(buildIndexes());
+        return executePromises(list);
+    }
+
+    // service.init_ = function() {        
+
+    //     var deferred = $q.defer();
+    
+    //     createDB();
+        
+    //     isDBInstalled()
+    //     .then(function() {
+    //         syncFromRemote().then(function(result){                                           
+    //             retrieveLists()
+    //             .then(reIndex)
+    //             .then(function() {                   
+    //                 deferred.resolve("DB Existed");
+    //             }).catch(function(err){                    
+    //                 initFail();
+    //                 deferred.reject("Err in getting init data: " + err);                     
+    //             });
+    //         }).catch(function(){                                   
+    //             retrieveLists()
+    //             .then(reIndex)
+    //             .then(function() {
+    //                 deferred.resolve("DB Existed");
+    //                 syncFail();
+    //             }).catch(function(err){                    
+    //                 initFail();
+    //                 deferred.reject("Err in getting init data: " + err);                     
+    //             });
+    //         });            
+    //     }).catch(function(e) {
+    //         //console.log("Cannot find install flag due to: " + e);
+
+    //         if(!hasNetwork()) {
+    //             //console.log("No network connect");
+    //             installFail();
+    //             deferred.reject("No network connect");                            
+    //         }else{
+    //             //ErrorService.showProgress();
+    //             cleanDB()
+    //             //.then(loadDBDump)
+    //             .then(syncFromRemote)      
+    //             .then(setupView)
+    //             //.then(setUpIndex)   
+    //             .then(retrieveListsForInstall)
+    //             //.then(reIndexForInstall)
+    //             .then(verifyView)
+    //             .then(loadImgs)          
+    //             .then(markInstalled)
+    //             .then(function() {
+    //                 deferred.resolve("DB Created");
+    //             }).catch(function (err){                
+    //                 console.log("install err, details = " + err);
+    //                 installFail();
+    //                 deferred.reject("Err in creating DB" + err);                            
+    //             });      
+    //         }
+    //     });
+
+    //     return deferred.promise;        
+    // };
 
     function setupIndexes() {        
         var list = [];
@@ -799,7 +889,7 @@ angular.module('app.services', [])
     }
 
     function retrieveLists(isInstall) {
-        //console.log("Start to retrieveLists");
+        console.log("Start to retrieveLists");
         var list = [];
         list.push(retrieveAllPlayers());
         list.push(retrieveAllMoves());
@@ -812,7 +902,7 @@ angular.module('app.services', [])
     }   
 
     function loadImgs() {
-        console.log("Start to loadPlayerImg");
+        console.log("Start to loadImgs");
         var list = [];
         list.push(loadMoveImg());
         list.push(loadPlayerImg());        
@@ -839,76 +929,103 @@ angular.module('app.services', [])
         return $q.all(promises);
     }
     
-    function verifyView() {        
-        //console.log("Start to verifyView");
-        var deferred = $q.defer();      
+    // function verifyView() {        
+    //     console.log("Start to verifyView");
+    //     var deferred = $q.defer();      
 
-        var playerID = list.getPlayerList()[0]._id;    
+    //     var playerID = list.getPlayerList()[0]._id;    
 
-        dataFetcher.getMovesByPlayer(playerID).then(function(result){
-            var moveID = result[0]._id;
-            pagination.clips().init(playerID, moveID).then(function(result) {
-                var search = {
-                    player: playerID,
-                    move: moveID
-                };
-                pagination.favorite().init(search).then(function(result) {
-                    //console.log("Index verified");
-                    deferred.resolve("Index verified");
-                }).catch(function(err) {
-                    deferred.reject(err);
-                });                        
-            }).catch(function(err) {
-                deferred.reject(err);
-            });
-        }).catch(function(err) {
-            deferred.reject(err);
-        });
-        return deferred.promise;        
-    }
+    //     dataFetcher.getMovesByPlayer(playerID).then(function(result){
+    //         var moveID = result[0]._id;
+    //         pagination.clips().init(playerID, moveID).then(function(result) {
+    //             // var search = {
+    //             //     player: playerID,
+    //             //     move: moveID
+    //             // };
+    //             // pagination.favorite().init(search).then(function(result) {
+    //             //     //console.log("Index verified");
+    //             //     deferred.resolve("Index verified");
+    //             // }).catch(function(err) {
+    //             //     deferred.reject(err);
+    //             // });    
+    //             console.log("finished to verifyView");   
+    //             deferred.resolve("Index verified");                 
+    //         }).catch(function(err) {
+    //             deferred.reject(err);
+    //         });
+    //     }).catch(function(err) {
+    //         deferred.reject(err);
+    //     });
+    //     return deferred.promise;        
+    // }
 
-    function reIndex(install) {       
-        
-        var playerID = list.getPlayerList()[0]._id,
+    function buildIndexes(install) {
+        console.log("start to buildIndexes");
+        var list = [];
 
-            moveID = list.getMoveList()[1]._id,
-
-            promiseList = [];
-
-        promiseList.push(dataFetcher.testMovesByPlayer(playerID));       
-
-        promiseList.push(pagination.clips().testClips(playerID, moveID));
+        //var views = ['players', 'allMoves', 'moves', 'clips', 'local'];
+        var views = ['moves', 'clips', 'local'];
 
         if(install) {
-            var search = {                    
-                    noResult: true                  
-                },
-                search1 = {
-                    player: playerID,
-                    noResult: true                  
-                },
-                search2 = {
-                    move: moveID,
-                    noResult: true
-                },
-                search3 = {
-                    player: playerID,                 
-                    move: moveID,
-                    noResult: true
-                };
-            promiseList.push(pagination.favorite().search(search));
-            promiseList.push(pagination.favorite().search(search1));
-            promiseList.push(pagination.favorite().search(search2));
-            promiseList.push(pagination.favorite().search(search3));
+            //views = ['players', 'allMoves', 'moves', 'clips', 'local', 'favorite', 'favorite_player_move', 'favorite_player', 'favorite_move'];
+            views = ['moves', 'clips', 'local', 'favorite', 'favorite_player_move', 'favorite_player', 'favorite_move'];
         }
 
-        return executePromises(promiseList);
+        for(i in views) {
+            list.push(db.query(views[i], {stale: 'update_after'}));
+        }
+
+        return executePromises(list);
     }
 
-    function reIndexForInstall() {
-        console.log("Start to reIndexForInstall");
-        return reIndex(true);
+    function buildIndexesForInstall() {    
+        return buildIndexes(false);
     }
+
+    // function reIndex(install) {
+
+    //     console.log("start to reIndex");       
+        
+    //     var playerID = list.getPlayerList()[0]._id,
+
+    //         moveID = list.getMoveList()[1]._id,
+
+    //         promiseList = [];
+
+    //     promiseList.push(dataFetcher.testMovesByPlayer(playerID));       
+
+    //     promiseList.push(pagination.clips().testClips(playerID, moveID));
+
+    //     if(install) {
+    //         var search = {                    
+    //                 noResult: true                  
+    //             },
+    //             search1 = {
+    //                 player: playerID,
+    //                 noResult: true                  
+    //             },
+    //             search2 = {
+    //                 move: moveID,
+    //                 noResult: true
+    //             },
+    //             search3 = {
+    //                 player: playerID,                 
+    //                 move: moveID,
+    //                 noResult: true
+    //             };
+    //         promiseList.push(pagination.favorite().search(search));
+    //         promiseList.push(pagination.favorite().search(search1));
+    //         promiseList.push(pagination.favorite().search(search2));
+    //         promiseList.push(pagination.favorite().search(search3));
+    //     }
+
+    //     return executePromises(promiseList);
+    // }
+
+    // function reIndexForInstall() {
+    //     //console.log("Start to reIndexForInstall");
+    //     return reIndex(true);
+    // }
 
     function initFail() {
         ErrorService.showAlert("启动遇到小问题", "请重启再试。", false);         
@@ -919,11 +1036,33 @@ angular.module('app.services', [])
     }
 
     function syncFail() {
-        if(isCordova() && navigator.connection.type === Connection.NONE) {
+        if(!hasNetwork()) {
             ErrorService.showAlert("无法同步最新数据", "请确认互联网连接。", false);            
         }else{
             ErrorService.showAlert("无法同步最新数据", "请稍候再试。", false);
         }        
+    }
+
+    function hasNetwork() {
+        if(!isCordova()) {
+            return true;
+        }else {
+            return navigator.connection.type !== Connection.NONE   
+        }
+        //return (isCordova() && navigator.connection.type !== Connection.NONE);
+    }
+
+    function generateDump() {
+        cleanDB()
+        .then(syncFromRemote)      
+        .then(setupView)
+        //.then(setUpIndex)
+        .then(buildIndexes)
+        //.then(retrieveListsForInstall)
+        //.then(reIndexForInstall)
+        .then(function(){
+            syncToRemote("cliplay_dump_2_26");
+        });        
     }
 
     function retrieveFavorites() {
@@ -937,10 +1076,12 @@ angular.module('app.services', [])
     }
 
     function retrieveAllPlayers() {
-        //console.log("ready for retrieveAllPlayers");
+        console.log("ready for retrieveAllPlayers");
         var deferred = $q.defer();
 
-        db.query('views/players', {reduce: true, group: true, group_level: 2}).then(function (result) {            
+        db.query('players', {reduce: true, group: true, group_level: 2}).then(function (result) {            
+
+            console.log("retrieveAllPlayers finised view");
             
             var keys = [], qtys = [];
             
@@ -956,6 +1097,9 @@ angular.module('app.services', [])
                                 
                 for(i in result.rows) {
                     result.rows[i].doc.clipQty = qtys[i];
+                    if (result.rows[i].doc.star == true) {
+                        list.starList.push(result.rows[i].doc);
+                    }
                 }     
 
                 result = result.rows.map(function(row) {
@@ -964,6 +1108,8 @@ angular.module('app.services', [])
 
                 list.setPlayerList(result);
 
+                console.log("retrieveAllPlayers finised all");
+
                 deferred.resolve("All players retrieved");
 
             }).catch(function (err) {
@@ -971,6 +1117,7 @@ angular.module('app.services', [])
             });
 
         }).catch(function (err) {
+            console.log(err);
             deferred.reject(err);
         });
 
@@ -979,9 +1126,11 @@ angular.module('app.services', [])
 
     function refreshAllPlayers() {
 
+        console.log("start to refreshAllPlayers");
+
         var deferred = $q.defer();
 
-        db.query('views/players', {reduce: true, group: true, group_level: 2}).then(function (result) {            
+        db.query('players', {reduce: true, group: true, group_level: 2}).then(function (result) {            
             
             var keys = [], qtys = [];
             var players = list.playerList;
@@ -1064,7 +1213,7 @@ angular.module('app.services', [])
             db = null;
         }
         //console.log("Start to createDB");
-        db = pouchdb.create(string.dbName, {size: 40, adapter: string.dbAdapter, auto_compaction: true});
+        db = pouchdb.create(string.dbName, {size: 40, adapter: string.dbAdapter, auto_compaction: false});
         //deleteDB();
         //db = pouchdb.create(string.dbName, {adapter: string.dbAdapter});        
         //db = pouchdb.create(string.dbName, {size: 40, adapter: string.dbAdapter, auto_compaction: false});
@@ -1073,16 +1222,13 @@ angular.module('app.services', [])
     }
 
     function syncFromRemote() {
-        console.log("Start to SyncFromRemote from: " + string.remoteURL + string.dbName);
-        if(!db) console.log("DB is null when SyncFromRemote");
+        //console.log("Start to SyncFromRemote from: " + string.remoteURL + string.dbName);        
         return db.replicate.from(string.remoteURL + string.dbName, {timeout: 10000});
-        //return db.replicate.from(string.remoteURL + "cliplay", {timeout: 10000});
     }
 
-    function syncToRemote() {
+    function syncToRemote(dbName) {
         //console.log("Start to syncToRemote from: " + string.remoteURL + string.dbName);
-        if(!db) console.log("DB is null when syncToRemote");
-        return db.replicate.to(string.remoteURL + string.dbName, {timeout: 3000});   
+        return db.replicate.to("http://admin:12341234@localhost:5984/" + dbName, {timeout: 3000});   
     }
 
     function loadDBDump() {
@@ -1090,14 +1236,7 @@ angular.module('app.services', [])
         
         var deferred = $q.defer();      
 
-        if(isCordova()) {            
-            // $.get(string.file, function(res) {   
-            //     console.log("string.remoteURL + string.dbName: " + string.remoteURL + string.dbName);
-            //     deferred.resolve(db.load(res, {
-            //         proxy: string.remoteURL + string.dbName
-            //     }));
-            //     // deferred.resolve(db.load(res));
-            // });
+        if(isCordova()) {           
 
             window.resolveLocalFileSystemURL(cordova.file.applicationDirectory + "/" + string.file, 
                 function(fileEntry){
@@ -1106,10 +1245,9 @@ angular.module('app.services', [])
                         var reader = new FileReader();
 
                         reader.onloadend = function(e) {
-
-                            deferred.resolve(db.load(this.result, {
-                                //proxy: string.remoteURL + string.dbName
-                            }));                            
+                            var option = (!string.installFail && hasNetwork()) ? {proxy: string.remoteURL + string.dbName}: {};
+                            deferred.resolve(db.load(this.result, option));                            
+                            // deferred.resolve(db.load(this.result));                            
                         }
 
                         reader.readAsText(file);
@@ -1133,100 +1271,218 @@ angular.module('app.services', [])
         return (typeof cordova !== 'undefined' || typeof phonegap !== 'undefined');
     };
 
+    function createDesignDoc(name, mapFunction, reduce) {
+        var ddoc = {
+            _id: '_design/' + name,
+            views: {}
+        };
+        ddoc.views[name] = { map: mapFunction.toString() };
+        if(reduce) {
+            ddoc.views[name].reduce = reduce;
+        }
+        return ddoc;
+    }
+
     function setupView() {
         //console.log("Start to setupView");
-        var ddoc = {
-            _id: '_design/views',
-            views: {
-                players: {
-                    map: function(doc) {
-                        var player, clip;
-                        if (doc.move_name && doc.clip_player) {
-                            for (clip in doc.clip_player) {
-                                player = doc.clip_player[clip];                                
-                                emit(player, clip);
-                                //emit([player, clip], 1);
-                            }
-                        }
-                    }.toString(),
-                    reduce: "_count"                
-                },
-                moves: {
-                    map: function(doc) {
-                        var player, clip;
-                        if (doc.move_name && doc.clip_player && doc.image) {
-                            for (clip in doc.clip_player) {
-                                player = doc.clip_player[clip];                                
-                                emit([player, doc.move_name, doc.image, doc.desc, doc._id], 1);
-                            }
-                        }
-                    }.toString(),
-                    reduce: function(key, values, rereduce) {
-                        return sum(values);
-                    }.toString()
-                },
-                clips: {
-                    map: function(doc) {
-                        var player, clip;
-                        if (doc.move_name && doc.clip_player) {
-                            for (clip in doc.clip_player) {
-                                player = doc.clip_player[clip];
-                                emit([player, doc._id, clip], clip);
-                            }
-                        }
-                    }.toString()                     
-                },
-                local: {
-                    map: function(doc) {      
-                        if (doc.type === 'clip') {
-                            emit(doc._id, {_id : doc.local, desc: doc.desc, name: doc.name, image: doc.image, local: doc.local});
-                        }
-                    }.toString()
-                },
-                favorite: {
-                    map: function(doc) { 
-                        if (doc.type === 'local') {
-                            emit([doc.favorite, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
-                        }
-                    }.toString()
-                },
-                favorite_player_move: {
-                    map: function(doc) { 
-                        if (doc.type === 'local') {
-                            emit([doc.favorite, doc.player, doc.move, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
-                        }
-                    }.toString()
-                },
-                favorite_player: {
-                    map: function(doc) { 
-                        if (doc.type === 'local') {
-                            emit([doc.favorite, doc.player, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
-                        }
-                    }.toString()
-                },
-                favorite_move: {
-                    map: function(doc) { 
-                        if (doc.type === 'local') {
-                            emit([doc.favorite, doc.move, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
-                        }
-                    }.toString()
-                }
-            }   
-        };
-        return db.put(ddoc);
-    }    
+        var designDocs = [];
 
-    function setUpIndex() {
-        //console.log("Start to setupIndex");
-    	return db.createIndex({
-    		index: {
-    			fields: ['type']
-    		}
-		});
-    }
+        designDocs.push(createDesignDoc('players', function (doc) {
+            var player, clip;
+            if (doc.move_name && doc.clip_player) {
+                for (clip in doc.clip_player) {
+                    player = doc.clip_player[clip];                                
+                    emit(player, clip);
+                }
+            }
+        },"_count"));
+
+        designDocs.push(createDesignDoc('moves', function (doc) {
+            var player, clip;
+            if (doc.move_name && doc.clip_player && doc.image) {
+                for (clip in doc.clip_player) {
+                    player = doc.clip_player[clip];                                
+                    emit([player, doc.move_name, doc.image, doc.desc, doc._id]);
+                }
+            }
+        },"_count"));
+
+        designDocs.push(createDesignDoc('clips', function (doc) {
+            var player, clip;
+            if (doc.move_name && doc.clip_player) {
+                for (clip in doc.clip_player) {
+                    player = doc.clip_player[clip];
+                    emit([player, doc._id, clip], clip);
+                }
+            }
+        }));
+
+        designDocs.push(createDesignDoc('local', function (doc) {
+            if (doc.type === 'clip') {
+                emit(doc._id, {_id : doc.local, desc: doc.desc, name: doc.name, image: doc.image, local: doc.local});
+            }
+        }));
+
+        designDocs.push(createDesignDoc('favorite', function (doc) {
+            if (doc.type === 'local') {
+                emit([doc.favorite, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
+            }
+        }));
+
+        designDocs.push(createDesignDoc('favorite_player_move', function (doc) {
+            if (doc.type === 'local') {
+                emit([doc.favorite, doc.player, doc.move, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
+            }
+        }));
+
+        designDocs.push(createDesignDoc('favorite_player', function (doc) {
+            if (doc.type === 'local') {
+                emit([doc.favorite, doc.player, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
+            }
+        }));
+
+        designDocs.push(createDesignDoc('favorite_move', function (doc) {
+            if (doc.type === 'local') {
+                emit([doc.favorite, doc.move, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
+            }
+        }));
+
+        designDocs.push(createDesignDoc('star', function (doc) {
+            if (doc.type === 'player' && doc.star && doc.star == true) {                            
+                emit(doc._id, {image: doc.image, name: doc.name});
+            }
+        }));
+
+        designDocs.push(createDesignDoc('allMoves', function (doc) {
+            if (doc.type === 'move') {                
+                emit(doc._id, {image: doc.image, name: doc.move_name});
+            }
+        }));
+
+        var list = [];
+
+        for(i in designDocs) {
+            list.push(db.put(designDocs[i]));
+        }
+
+        return executePromises(list);
+    }  
+
+  //   function setupView_() {
+  //       //console.log("Start to setupView");
+  //       var ddoc = {
+  //           _id: '_design/views',
+  //           views: {
+  //               players: {
+  //                   map: function(doc) {
+  //                       var player, clip;
+  //                       if (doc.move_name && doc.clip_player) {
+  //                           for (clip in doc.clip_player) {
+  //                               player = doc.clip_player[clip];                                
+  //                               emit(player, clip);
+  //                               //emit([player, clip], 1);
+  //                           }
+  //                       }
+  //                   }.toString(),
+  //                   reduce: "_count"                
+  //               },
+  //               moves: {
+  //                   map: function(doc) {
+  //                       var player, clip;
+  //                       if (doc.move_name && doc.clip_player && doc.image) {
+  //                           for (clip in doc.clip_player) {
+  //                               player = doc.clip_player[clip];                                
+  //                               // emit([player, doc.move_name, doc.image, doc.desc, doc._id], 1);
+  //                               emit([player, doc.move_name, doc.image, doc.desc, doc._id]);
+  //                               //emit([player, doc.move_name, doc.image, doc._id]);
+  //                           }
+  //                       }
+  //                   }.toString(),
+  //                   reduce: "_count"
+  //                   // reduce: function(key, values, rereduce) {
+  //                   //     return sum(values);
+  //                   // }.toString()
+  //               },
+  //               clips: {
+  //                   map: function(doc) {
+  //                       var player, clip;
+  //                       if (doc.move_name && doc.clip_player) {
+  //                           for (clip in doc.clip_player) {
+  //                               player = doc.clip_player[clip];
+  //                               emit([player, doc._id, clip], clip);
+  //                           }
+  //                       }
+  //                   }.toString()                     
+  //               },
+  //               local: {
+  //                   map: function(doc) {      
+  //                       if (doc.type === 'clip') {
+  //                           emit(doc._id, {_id : doc.local, desc: doc.desc, name: doc.name, image: doc.image, local: doc.local});
+  //                       }
+  //                   }.toString()
+  //               },
+  //               favorite: {
+  //                   map: function(doc) { 
+  //                       if (doc.type === 'local') {
+  //                           emit([doc.favorite, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
+  //                       }
+  //                   }.toString()
+  //               },
+  //               favorite_player_move: {
+  //                   map: function(doc) { 
+  //                       if (doc.type === 'local') {
+  //                           emit([doc.favorite, doc.player, doc.move, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
+  //                       }
+  //                   }.toString()
+  //               },
+  //               favorite_player: {
+  //                   map: function(doc) { 
+  //                       if (doc.type === 'local') {
+  //                           emit([doc.favorite, doc.player, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
+  //                       }
+  //                   }.toString()
+  //               },
+  //               favorite_move: {
+  //                   map: function(doc) { 
+  //                       if (doc.type === 'local') {
+  //                           emit([doc.favorite, doc.move, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
+  //                       }
+  //                   }.toString()
+  //               },
+  //               star: {
+  //                   map: function(doc) { 
+  //                       if (doc.type === 'player') {
+  //                           //emit(doc.star, doc._id, doc.image, doc.name);
+  //                           emit(doc.star, {_id: doc._id, image: doc.image, name: doc.name});
+  //                           //emit(doc.star, [doc._id, doc.name, doc.image]);
+  //                       }
+  //                   }.toString()  
+  //               },
+  //               allMoves: {
+  //                   map: function(doc) { 
+  //                       if (doc.type === 'move') {
+  //                           //emit(doc._id, doc.image, doc.move_name);
+  //                           //emit(doc._id);
+  //                           emit(doc._id, {image: doc.image, name: doc.move_name});
+  //                       }
+  //                   }.toString()  
+  //               }
+  //           }   
+  //       };
+  //       return db.put(ddoc);
+  //   }    
+
+  //   function setUpIndex() {
+  //       //console.log("Start to setupIndex");
+  //   	return db.createIndex({
+  //   		index: {
+  //   			fields: ['type']
+  //   		}
+		// });
+  //   }
     
     function markInstalled() {
-        //console.log("Install finished");
+        console.log("Install finished");
         return db.put({
             _id: '_local/DBInstalled',
             status: 'completed'

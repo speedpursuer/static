@@ -14,7 +14,7 @@
          </ion-refresher>
          -->
          <ion-slide-box>
-          <ion-slide ng-repeat="item in stars" ng-click='showMoves(item._id, item.name)'>          
+          <ion-slide ng-repeat="item in stars | orderBy: '_id'" ng-click='showMoves(item._id, item.name)'>          
             <!---
             <ion-slide ng-repeat="item in players" ui-sref='tabsController.clips({playerID: item._id, playerName: item.name})'>
             <ion-slide ng-repeat="item in players" ng-click="select(item.doc._id)" ui-sref='clips({playerID: item.doc._id})'>

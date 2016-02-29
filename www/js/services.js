@@ -6,7 +6,7 @@ angular.module('app.services', [])
     var service = {};    
 
     var string = {
-        dbName: "cliplay",     
+        dbName: "cliplay_new",     
         remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",
         file: dbString? dbString.split(",")[1]: "db.txt",
         dbAdapter: "websql",
@@ -20,13 +20,271 @@ angular.module('app.services', [])
     //db.info().then(console.log.bind(console));
     //deleteDB();
 
+    var dataTransfer = {
+
+        players: [],
+        moves: [],
+        clips: [],
+        db_new: {},      
+
+        getDateID: function() {
+            var currentdate = new Date();
+            var datetime = "" + 
+                           currentdate.getFullYear() + 
+                           (currentdate.getMonth() + 1) + 
+                           currentdate.getDate() + 
+                           currentdate.getHours() +
+                           currentdate.getMinutes() + 
+                           currentdate.getSeconds();
+            return datetime;
+        },    
+
+        countByPlayer: function(playerID, pList) {            
+            var that = this;
+
+            return $q(function(resolve, reject) {
+                that.db_new.allDocs({startkey: "clip_" + playerID, endkey: "clip_" + playerID + "\uffff"})
+                .then(function(result) {                 
+                    pList[playerID] = {total: result.rows.length};
+                    resolve("ok");
+                });
+            });                
+        },
+
+        countByPlayerMove: function(playerID, moveID, pList) {        
+
+            var that = this;
+
+            return $q(function(resolve, reject) {
+                that.db_new.allDocs({startkey: "clip_" + playerID + "_" + moveID, endkey: "clip_" + playerID + "_" + moveID + "\uffff"})
+                .then(function(result) {                   
+                    pList[playerID][moveID] = result.rows.length;                        
+                    resolve("ok");
+                });
+            });                
+        },
+
+        cleanDB: function(_db, dbName) {      
+            var deferred = $q.defer();
+            _db.destroy().then(function() {
+                _db = pouchdb.create(dbName, {adapter: string.dbAdapter, auto_compaction: false});                
+                deferred.resolve("DB recreated");                     
+            }).catch(function() {
+                deferred.reject("DB destroy err");
+            });
+            return deferred.promise;
+        },
+
+        transfer: function() {
+            db = pouchdb.create("cliplay", {adapter: string.dbAdapter, auto_compaction: false});                
+            this.db_new = pouchdb.create("cliplay_new", {adapter: string.dbAdapter, auto_compaction: false});
+
+            var that = this;
+
+            that.cleanDB(db, "cliplay")
+            .then(function() {
+                that.cleanDB(that.db_new, "cliplay_new").then(function(){
+                    loadDBDump().then(function() {
+                        setUpIndex().then(function(){                
+                            
+                            var list = [];                            
+
+                            list.push(that.getList("player", dataTransfer.players));
+
+                            list.push(that.getList("move", dataTransfer.moves));
+
+                            list.push(that.getList("clip", dataTransfer.clips));
+
+                            executePromises(list).then(function() {
+                                console.log("player = " + dataTransfer.players['player10'].name);
+                                console.log("move = " + dataTransfer.moves.length);
+                                console.log("clip = " + dataTransfer.clips.length);
+
+                                var moves = dataTransfer.moves;
+                                var players = dataTransfer.players;
+                                var clips = dataTransfer.clips;
+                                
+
+                                var moveList = [], playerList = [], clipList = [], pList = {};
+
+                                for(i in moves) {
+                                    var el = moves[i];
+
+                                    var item = {
+                                        _id: "move_" + el._id.toLowerCase(),
+                                        desc: el.desc,
+                                        image: el.image,
+                                        move_name: el.move_name
+                                    };
+
+                                    moveList.push(item);
+                                }
+
+                                var id = parseInt(that.getDateID());
+
+                                for(i in clips) {                                
+                                                                    
+                                    var el = clips[i];
+
+                                    var playerName = "";
+                                    var moveName = "";
+
+                                    try{
+                                        playerName = players[el.player].name_en.replace(/ /g,"_");
+                                        moveName = moves[el.move]._id;                                  
+                                    }
+                                    catch(err){
+                                        console.log(err + " happens in: " + el._id);
+                                    }
+                                
+                                    var prefix = "player_" + playerName.toLowerCase() + "_move_" + moveName.toLowerCase() + "_" + id;
+
+                                    var item = {
+                                        _id: "clip_" + prefix,
+                                        desc: el.desc,
+                                        image: el.image,
+                                        name: el.name,
+                                        local: "local_" + prefix,
+                                    };
+
+                                    clipList.push(item);
+
+                                    id++;
+                                }
+
+                                that.db_new.bulkDocs(moveList.concat(clipList)).then(function (result) {
+
+                                    var list = [];                       
+                                    
+                                    for(i in players) {
+                                    
+                                        var el = players[i];
+
+                                        var id = "player_" + el.name_en.replace(/ /g,"_").toLowerCase();                                       
+
+                                        console.log(id);                                   
+
+                                        list.push(that.countByPlayer(id, pList));                                        
+
+                                        for(i in moves) {
+                                            var id_move = "move_" + moves[i]._id.toLowerCase();
+
+                                            list.push(that.countByPlayerMove(id, id_move, pList));                                                    
+                                        }                                                                                
+                                    }
+
+                                    executePromises(list).then(function(){                                 
+
+                                        for(i in players) {
+
+                                            var el = players[i];
+
+                                            var id = "player_" + el.name_en.replace(/ /g,"_").toLowerCase();  
+
+                                            var playerCount = pList[id];
+
+                                            var moveList = {};
+
+                                            var total = 0;
+
+                                            for(b in playerCount) {
+                                                if(b == "total") {
+                                                    total = playerCount[b];
+                                                }else{
+                                                    moveList[b] = playerCount[b];
+                                                }
+                                            }
+
+                                            var item = {
+                                                _id: id,
+                                                desc: el.desc,
+                                                image: el.image,
+                                                name: el.name,
+                                                name_en: el.name_en,
+                                                star: el.star,
+                                                avatar: el.avatar,
+                                                clip_total: total,
+                                                clip_moves: moveList
+                                            };
+
+                                            playerList.push(item);
+                                        }
+                                        
+                                        that.db_new.bulkDocs(playerList).then(function (result) {
+                                            that.db_new.replicate.to("http://admin:12341234@localhost:5984/cliplay_new", {timeout: 3000})
+                                            .then(function(result){
+                                                console.log(result);
+                                            }).catch(function(e){
+                                                console.log(e);
+                                            });
+                                        }).catch(function (err) {
+                                            console.log(err);
+                                        });                                      
+
+                                    }).catch(function(e){
+                                        console.log(e);
+                                    });
+
+                                }).catch(function (err) {
+                                    console.log(err);
+                                });                                                        
+                            });
+                        }).catch(function(e) {
+                            console.log(e);
+                        });             
+                    });
+                });
+            })
+        },
+
+        getList: function(type, list) {
+            return $q(function(resolve, reject) {
+                db.find({
+                    selector: {type: type}
+                }).then(function(result) {
+                    if(type=="player") {
+                        
+                        var list = result.docs;
+
+                        var returnList = [];
+
+                        for(i in list) {
+                            var id = list[i]._id;
+                            returnList[id] = list[i];
+                        }
+
+                        dataTransfer.players = returnList;
+
+                    }else if(type=="move"){
+
+                        var list = result.docs;
+
+                        var returnList = [];
+
+                        for(i in list) {
+                            var id = list[i]._id;
+                            returnList[id] = list[i];
+                        }
+
+                        dataTransfer.moves = returnList;
+                    }else {
+                        dataTransfer.clips = result.docs;
+                    }                    
+                    resolve("");
+                }).catch(function() {
+                    reject("");
+                })
+            });
+        }        
+    };
+
     service.list = function() {
         return list;
     };      
 
     service.dataFetcher = function() {
         return dataFetcher;
-    }; 
+    };
 
     service.pagination = function() {
         return pagination;
@@ -158,6 +416,35 @@ angular.module('app.services', [])
             console.log("start to getMoves");
             var deferred = $q.defer();
 
+            db.allDocs({
+                include_docs: true,
+                startkey: "move",
+                endkey: "move\uffff"            
+            }).then(function (result) {
+                                    
+                result = result.rows.map(function(row) {
+                    //row.doc.clipQty = row.doc.clip_total
+                    return row.doc;
+                });
+
+                list.setMoveList(result);
+
+                console.log("getMoves finised");
+
+                deferred.resolve("All moves retrieved");
+
+            }).catch(function (err) {
+                deferred.reject(err);
+            });
+
+            return deferred.promise;
+        },
+
+        getMoves_: function() {
+
+            console.log("start to getMoves");
+            var deferred = $q.defer();
+
             db.query('allMoves').then(function(result){
                 console.log("finished to getMoves");
 
@@ -179,7 +466,7 @@ angular.module('app.services', [])
             return deferred.promise;
         },
 
-        getMoves_: function() {
+        getMoves__: function() {
 
             console.log("start to getMoves");
             var deferred = $q.defer();
@@ -199,6 +486,42 @@ angular.module('app.services', [])
         },
 
         getMovesByPlayer: function(playerID) {
+            var deferred = $q.defer();            
+
+            db.get(playerID).then(function(result){
+
+                var moves = result.clip_moves;
+
+                var keys = [];
+
+                for(i in moves) {
+                    if(parseInt(moves[i]) > 0) keys.push(i);
+                }
+                
+                db.allDocs({
+                    include_docs: true,
+                    keys: keys
+                }).then(function (result) {
+                                        
+                    result = result.rows.map(function(row) {
+                        row.doc.clipQty = moves[row.doc._id];   
+                        row.doc.name = row.doc.move_name;
+                        return row.doc;
+                    });
+
+                    deferred.resolve(result);
+
+                }).catch(function (err) {
+                    deferred.reject(err);
+                });
+            }).catch(function(){
+
+            });          
+
+            return deferred.promise;       
+        },
+
+        getMovesByPlayer_: function(playerID) {
             var deferred = $q.defer();
             var option = {startkey: [playerID], endkey: [playerID, {}], reduce: true, group: true};
             
@@ -248,7 +571,8 @@ angular.module('app.services', [])
             limit: isPad? 12: 7,    
             descending: true,           
             init: function(playerID, moveID) {
-                this.options = {descending : this.descending, limit : this.limit, endkey: [playerID, moveID], startkey: [playerID, moveID, {}], reduce: true, group: true};                                
+                //this.options = {descending : this.descending, limit : this.limit, endkey: [playerID, moveID], startkey: [playerID, moveID, {}], reduce: true, group: true};                                
+                this.options = {descending : this.descending, include_docs: true, limit : this.limit, endkey: "clip_" + playerID + "_" + moveID, startkey: "clip_" + playerID + "_" + moveID + "\uffff"};                                
                 list.resetClipList();
                 this.end.noMore = true;
                 return this.getClips();
@@ -268,6 +592,50 @@ angular.module('app.services', [])
             },
            
             getClips: function() {
+
+                var deferred = $q.defer();
+
+                var that = this;
+
+                var _options = that.options;
+                
+                db.allDocs(_options).then(function (result) {
+
+                    if (result && result.rows.length > 0) {
+
+                        _options.startkey = result.rows[result.rows.length - 1].key;
+
+                        result = result.rows.map(function(row) {
+                            //row.doc.clipQty = row.doc.clip_total
+                            return row.doc;
+                        });
+
+                        if(result.length < that.limit) {
+                            that.end.noMore = true;
+                        }else{
+                            that.end.noMore = false;
+                        }
+
+                        if(result.length == that.limit) {
+                            result.splice(-1,1);
+                        }                            
+                        
+                        list.setClipList(result);
+                        deferred.resolve("More data fetched");
+
+                    }else{                       
+                        that.end.noMore = true;            
+                        deferred.resolve("No more data");             
+                    }                                                        
+
+                }).catch(function (err) {
+                    deferred.reject(err);
+                });
+
+                return deferred.promise;
+            },
+
+            getClips_: function() {
 
                 var deferred = $q.defer();
 
@@ -736,8 +1104,10 @@ angular.module('app.services', [])
     };
 
     service.init = function() {        
-        console.log("start to init");
+        //console.log("start to init");
         var deferred = $q.defer();
+
+        //dataTransfer.transfer(); return;
 
         createDB();
         //generateDump(); return;
@@ -764,7 +1134,7 @@ angular.module('app.services', [])
         return deferred.promise;        
     };
 
-    function syncData(deferred, install) {
+    function syncData_(deferred, install) {
         console.log("start to syncData");
         syncFromRemote().then(function(result){
             console.log("finished to syncFromRemote");
@@ -787,10 +1157,18 @@ angular.module('app.services', [])
         });   
     }
 
+    function syncData(deferred, install) {
+        if(install) {
+            bootstrapForInstall(deferred);
+        }else{
+            bootstrap(deferred);    
+        } 
+    }
+
     function bootstrap(deferred, callback) {       
         retrieveLists()
         //.then(reIndex)
-        .then(buildIndexes)
+        //.then(buildIndexes)
         .then(function() {                   
             deferred.resolve("data prefetched");
             if(callback) callback();
@@ -803,7 +1181,7 @@ angular.module('app.services', [])
     function bootstrapForInstall(deferred, callback) {     
         
         retrieveListsForInstall()                
-        .then(buildIndexesForInstall)
+        //.then(buildIndexesForInstall)
         .then(loadImgs)
         .then(function() {                 
             deferred.resolve("data prefetched");
@@ -893,7 +1271,7 @@ angular.module('app.services', [])
         var list = [];
         list.push(retrieveAllPlayers());
         list.push(retrieveAllMoves());
-        if(!isInstall) list.push(retrieveFavorites());
+        //if(!isInstall) list.push(retrieveFavorites());
         return executePromises(list);
     }
 
@@ -1076,6 +1454,40 @@ angular.module('app.services', [])
     }
 
     function retrieveAllPlayers() {
+        console.log("ready for retrieveAllPlayers");
+        var deferred = $q.defer();
+
+        db.allDocs({
+            include_docs: true,
+            startkey: "player",
+            endkey: "player\uffff"            
+        }).then(function (result) {
+                                
+            result = result.rows.map(function(row) {
+                row.doc.clipQty = row.doc.clip_total
+                return row.doc;
+            });
+
+            for(i in result) {                
+                if (result[i].star == true) {
+                    list.starList.push(result[i]);
+                }
+            }
+
+            list.setPlayerList(result);
+
+            console.log("retrieveAllPlayers finised all");
+
+            deferred.resolve("All players retrieved");
+
+        }).catch(function (err) {
+            deferred.reject(err);
+        });
+
+        return deferred.promise;
+    }
+
+    function retrieveAllPlayers_() {
         console.log("ready for retrieveAllPlayers");
         var deferred = $q.defer();
 
@@ -1472,14 +1884,14 @@ angular.module('app.services', [])
   //       return db.put(ddoc);
   //   }    
 
-  //   function setUpIndex() {
-  //       //console.log("Start to setupIndex");
-  //   	return db.createIndex({
-  //   		index: {
-  //   			fields: ['type']
-  //   		}
-		// });
-  //   }
+    function setUpIndex() {
+        console.log("Start to setupIndex");
+    	return db.createIndex({
+    		index: {
+    			fields: ['type']
+    		}
+		});
+    }
     
     function markInstalled() {
         console.log("Install finished");

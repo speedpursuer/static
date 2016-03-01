@@ -57330,6 +57330,13 @@ IonicModule
       }
     }
 
+    $scope.$on('scroll.refreshStart', function() {      
+      ionic.requestAnimationFrame(show);
+      ionic.requestAnimationFrame(activate);
+      start();
+      scrollTo(ptrThreshold, scrollTime);
+    });
+
     $scope.$on('scroll.refreshComplete', function() {
       // prevent the complete from firing before the scroll has started
       $timeout(function() {

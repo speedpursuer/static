@@ -1,4 +1,4 @@
-<ion-view title="{{playerName}}" hide-tabs="'true'">
+<ion-view title="{{playerName}}" hide-tabs="true">
     <ion-content>       
 		<ion-list>
 			<ion-item ng-repeat="item in moves|orderBy:'clipQty':true" class="item-thumbnail-left" ng-click="showClips(item.name, item._id)">

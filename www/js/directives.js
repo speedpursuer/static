@@ -20,12 +20,14 @@ angular.module('app.directives', [])
 
             scope.$on('$ionicView.beforeEnter', function() {
                 scope.$watch(attributes.hideTabs, function(value){
+                    console.log("$rootScope.hideTabs = " + value);
                     $rootScope.hideTabs = value;
                 });
             });
 
             scope.$on('$ionicView.beforeLeave', function() {
-                $rootScope.hideTabs = false;
+                console.log("$rootScope.hideTabs = false");
+                //$rootScope.hideTabs = false;
             });
         }
     };

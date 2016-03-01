@@ -6,7 +6,7 @@ angular.module('app.services', [])
     var service = {};    
 
     var string = {
-        dbName: "cliplay_new",     
+        dbName: dbString? "cliplay_prod": "cliplay_dev",  
         remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",
         file: dbString? dbString.split(",")[1]: "db.txt",
         dbAdapter: "websql",
@@ -17,15 +17,12 @@ angular.module('app.services', [])
 
     var isPad = (typeof device !== 'undefined' && device.model.indexOf("iPad") !== -1)? true: false;
 
-    //db.info().then(console.log.bind(console));
-    //deleteDB();
-
     var dataTransfer = {
 
         players: [],
         moves: [],
         clips: [],
-        db_new: {},      
+        db_new: {},  
 
         getDateID: function() {
             var currentdate = new Date();
@@ -84,7 +81,7 @@ angular.module('app.services', [])
             that.cleanDB(db, "cliplay")
             .then(function() {
                 that.cleanDB(that.db_new, "cliplay_new").then(function(){
-                    loadDBDump().then(function() {
+                    syncFromRemote().then(function() {
                         setUpIndex().then(function(){                
                             
                             var list = [];                            
@@ -96,10 +93,7 @@ angular.module('app.services', [])
                             list.push(that.getList("clip", dataTransfer.clips));
 
                             executePromises(list).then(function() {
-                                console.log("player = " + dataTransfer.players['player10'].name);
-                                console.log("move = " + dataTransfer.moves.length);
-                                console.log("clip = " + dataTransfer.clips.length);
-
+                                
                                 var moves = dataTransfer.moves;
                                 var players = dataTransfer.players;
                                 var clips = dataTransfer.clips;
@@ -145,6 +139,8 @@ angular.module('app.services', [])
                                         image: el.image,
                                         name: el.name,
                                         local: "local_" + prefix,
+                                        move: "move_" + moveName.toLowerCase(),
+                                        player: "player_" + playerName.toLowerCase()
                                     };
 
                                     clipList.push(item);
@@ -605,24 +601,37 @@ angular.module('app.services', [])
 
                         _options.startkey = result.rows[result.rows.length - 1].key;
 
+                        var keys = [];
+
                         result = result.rows.map(function(row) {
-                            //row.doc.clipQty = row.doc.clip_total
+                            keys.push(row.doc.local);
                             return row.doc;
-                        });
+                        });                        
 
-                        if(result.length < that.limit) {
-                            that.end.noMore = true;
-                        }else{
-                            that.end.noMore = false;
-                        }
+                        db.allDocs({keys: keys, include_docs: true}).then(function (r) {                            
 
-                        if(result.length == that.limit) {
-                            result.splice(-1,1);
-                        }                            
-                        
-                        list.setClipList(result);
-                        deferred.resolve("More data fetched");
+                            for(i in result) {
+                                var local = r.rows[i];                                                    
+                                result[i].thumb = local.doc? local.doc.thumb: "";
+                                result[i].favorite = local.doc? local.doc.favorite: false;
+                            }
 
+                            if(result.length < that.limit) {
+                                that.end.noMore = true;
+                            }else{
+                                that.end.noMore = false;
+                            }
+
+                            if(result.length == that.limit) {
+                                result.splice(-1,1);
+                            }                            
+                            
+                            list.setClipList(result);
+                            deferred.resolve("More data fetched");
+
+                        }).catch(function(err){
+                            deferred.reject(err);
+                        });                        
                     }else{                       
                         that.end.noMore = true;            
                         deferred.resolve("No more data");             
@@ -865,7 +874,12 @@ angular.module('app.services', [])
                     //retrieveAllPlayers();
                     //retrieveAllMoves();
                     //verifyView();
-                    reBootstrap().finally(function(){
+                    // reBootstrap().finally(function(){
+                    //     console.log("finished refresh");
+                    //     if(callback) callback();        
+                    // });
+
+                    refreshAllPlayers().finally(function(){
                         console.log("finished refresh");
                         if(callback) callback();        
                     });
@@ -1116,7 +1130,7 @@ angular.module('app.services', [])
         .then(function() {        
             syncData(deferred, false);
         }).catch(function(e) {
-            ErrorService.showProgress();          
+            //ErrorService.showProgress();          
             cleanDB()
             .then(loadDBDump)
             .then(markInstalled)
@@ -1124,9 +1138,8 @@ angular.module('app.services', [])
                 //console.log("DB installed");                
                 syncData(deferred, true);
             }).catch(function (err){                
-                console.log("install err, details = " + err);
-                string.installFail = true;
-                initFail();
+                console.log("install err, details = " + err);                
+                installFail();
                 deferred.reject("Err in creating DB" + err);                            
             });
         });
@@ -1180,9 +1193,9 @@ angular.module('app.services', [])
 
     function bootstrapForInstall(deferred, callback) {     
         
-        retrieveListsForInstall()                
+        retrieveListsForInstall()            
         //.then(buildIndexesForInstall)
-        .then(loadImgs)
+        //.then(loadImgs)
         .then(function() {                 
             deferred.resolve("data prefetched");
             if(callback) callback();
@@ -1271,7 +1284,7 @@ angular.module('app.services', [])
         var list = [];
         list.push(retrieveAllPlayers());
         list.push(retrieveAllMoves());
-        //if(!isInstall) list.push(retrieveFavorites());
+        if(!isInstall) list.push(retrieveFavorites());
         return executePromises(list);
     }
 
@@ -1406,11 +1419,12 @@ angular.module('app.services', [])
     // }
 
     function initFail() {
-        ErrorService.showAlert("启动遇到小问题", "请重启再试。", false);         
+        ErrorService.showAlert("启动遇到问题", "请您重新下载安装。", false);         
     }
 
     function installFail() {
-        ErrorService.showAlert("启动遇到小问题", "请检查网络后再试。", false);         
+        string.installFail = true;
+        ErrorService.showAlert("安装遇到小问题", "请点击重试。", true);       
     }
 
     function syncFail() {
@@ -1431,15 +1445,16 @@ angular.module('app.services', [])
     }
 
     function generateDump() {
-        cleanDB()
-        .then(syncFromRemote)      
-        .then(setupView)
+        setupView()
+        //cleanDB()
+        //.then(syncFromRemote)      
+        //.then(setupView)
         //.then(setUpIndex)
-        .then(buildIndexes)
+        //.then(buildIndexes)
         //.then(retrieveListsForInstall)
         //.then(reIndexForInstall)
         .then(function(){
-            syncToRemote("cliplay_dump_2_26");
+            syncToRemote("cliplay_dump_2_29");
         });        
     }
 
@@ -1469,9 +1484,12 @@ angular.module('app.services', [])
             });
 
             for(i in result) {                
-                if (result[i].star == true) {
+                if (result[i].star) {
                     list.starList.push(result[i]);
                 }
+                // if(result[i].clipQty == 0) {
+                //     result
+                // }
             }
 
             list.setPlayerList(result);
@@ -1537,6 +1555,46 @@ angular.module('app.services', [])
     }
 
     function refreshAllPlayers() {
+
+        console.log("start to refreshAllPlayers");
+
+        var deferred = $q.defer();
+
+        db.allDocs({
+            include_docs: true,
+            startkey: "player",
+            endkey: "player\uffff"            
+        }).then(function (result) {
+
+            var players = list.playerList;
+
+            for(i in result.rows) {
+                
+                var index = findIndex(players, result.rows[i].key);    
+
+                if(index == -1) {
+
+                    result.rows[i].doc.clipQty = result.rows[i].doc.clip_total
+                    insertArray(players, result.rows[i].doc);
+
+                } else {
+
+                    if(players[index].clipQty != result.rows[i].doc.clip_total) {
+                        players[index].clipQty = result.rows[i].doc.clp_total;
+                    }    
+                }             
+            }
+
+            deferred.resolve("All players refreshed");
+
+        }).catch(function (err) {
+            deferred.reject(err);
+        });
+
+        return deferred.promise;
+    }
+
+    function refreshAllPlayers_() {
 
         console.log("start to refreshAllPlayers");
 
@@ -1658,7 +1716,9 @@ angular.module('app.services', [])
 
                         reader.onloadend = function(e) {
                             var option = (!string.installFail && hasNetwork()) ? {proxy: string.remoteURL + string.dbName}: {};
-                            deferred.resolve(db.load(this.result, option));                            
+                            //console.log("onloadend = " + this.result);
+                            //var option = {};
+                            deferred.resolve(db.load(this.result, option));                       
                             // deferred.resolve(db.load(this.result));                            
                         }
 
@@ -1699,41 +1759,41 @@ angular.module('app.services', [])
         //console.log("Start to setupView");
         var designDocs = [];
 
-        designDocs.push(createDesignDoc('players', function (doc) {
-            var player, clip;
-            if (doc.move_name && doc.clip_player) {
-                for (clip in doc.clip_player) {
-                    player = doc.clip_player[clip];                                
-                    emit(player, clip);
-                }
-            }
-        },"_count"));
+        // designDocs.push(createDesignDoc('players', function (doc) {
+        //     var player, clip;
+        //     if (doc.move_name && doc.clip_player) {
+        //         for (clip in doc.clip_player) {
+        //             player = doc.clip_player[clip];                                
+        //             emit(player, clip);
+        //         }
+        //     }
+        // },"_count"));
 
-        designDocs.push(createDesignDoc('moves', function (doc) {
-            var player, clip;
-            if (doc.move_name && doc.clip_player && doc.image) {
-                for (clip in doc.clip_player) {
-                    player = doc.clip_player[clip];                                
-                    emit([player, doc.move_name, doc.image, doc.desc, doc._id]);
-                }
-            }
-        },"_count"));
+        // designDocs.push(createDesignDoc('moves', function (doc) {
+        //     var player, clip;
+        //     if (doc.move_name && doc.clip_player && doc.image) {
+        //         for (clip in doc.clip_player) {
+        //             player = doc.clip_player[clip];                                
+        //             emit([player, doc.move_name, doc.image, doc.desc, doc._id]);
+        //         }
+        //     }
+        // },"_count"));
 
-        designDocs.push(createDesignDoc('clips', function (doc) {
-            var player, clip;
-            if (doc.move_name && doc.clip_player) {
-                for (clip in doc.clip_player) {
-                    player = doc.clip_player[clip];
-                    emit([player, doc._id, clip], clip);
-                }
-            }
-        }));
+        // designDocs.push(createDesignDoc('clips', function (doc) {
+        //     var player, clip;
+        //     if (doc.move_name && doc.clip_player) {
+        //         for (clip in doc.clip_player) {
+        //             player = doc.clip_player[clip];
+        //             emit([player, doc._id, clip], clip);
+        //         }
+        //     }
+        // }));
 
-        designDocs.push(createDesignDoc('local', function (doc) {
-            if (doc.type === 'clip') {
-                emit(doc._id, {_id : doc.local, desc: doc.desc, name: doc.name, image: doc.image, local: doc.local});
-            }
-        }));
+        // designDocs.push(createDesignDoc('local', function (doc) {
+        //     if (doc.type === 'clip') {
+        //         emit(doc._id, {_id : doc.local, desc: doc.desc, name: doc.name, image: doc.image, local: doc.local});
+        //     }
+        // }));
 
         designDocs.push(createDesignDoc('favorite', function (doc) {
             if (doc.type === 'local') {
@@ -1759,17 +1819,17 @@ angular.module('app.services', [])
             }
         }));
 
-        designDocs.push(createDesignDoc('star', function (doc) {
-            if (doc.type === 'player' && doc.star && doc.star == true) {                            
-                emit(doc._id, {image: doc.image, name: doc.name});
-            }
-        }));
+        // designDocs.push(createDesignDoc('star', function (doc) {
+        //     if (doc.type === 'player' && doc.star && doc.star == true) {                            
+        //         emit(doc._id, {image: doc.image, name: doc.name});
+        //     }
+        // }));
 
-        designDocs.push(createDesignDoc('allMoves', function (doc) {
-            if (doc.type === 'move') {                
-                emit(doc._id, {image: doc.image, name: doc.move_name});
-            }
-        }));
+        // designDocs.push(createDesignDoc('allMoves', function (doc) {
+        //     if (doc.type === 'move') {                
+        //         emit(doc._id, {image: doc.image, name: doc.move_name});
+        //     }
+        // }));
 
         var list = [];
 
@@ -2085,7 +2145,7 @@ angular.module('app.services', [])
     // service.hideModal = function() {
     //     if($rootScope.modal.isShown()) {
     //         $rootScope.modal.hide();
-    //         $rootScope.modal.remove();    
+    //         //$rootScope.modal.remove();    
     //     }
     // };
 
@@ -2096,7 +2156,7 @@ angular.module('app.services', [])
     service.hideSplashScreen = function() {
         $timeout(function() {
             $cordovaSplashscreen.hide();
-        }, 500);   
+        });   
     };
 
     service.showProgress = function() {        
@@ -2123,10 +2183,11 @@ angular.module('app.services', [])
         });
     };
     
-    service.showLoader = function() {
+    service.showLoader = function(duration) {
         $ionicLoading.show({
             template: '<ion-spinner icon="crescent" class="spinner-assertive"></ion-spinner>',
-            hideOnStateChange: false
+            hideOnStateChange: false,
+            duration: duration? duration: 0
         });
     };
 

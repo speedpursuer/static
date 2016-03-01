@@ -7,20 +7,27 @@ angular.module('app.controllers', [])
 	}());	  
 
 	$scope.retry = function() {
-  	cacheViews();  	
-  };
+  		cacheViews();  	
+  	};
 
-  function cacheViews() {
-		$state.go("tabsController.favorite").then(function(result) {
-  		$timeout(function() {
-		  	$state.go("tabsController.players").then(function(result) {
-					$timeout(function() {
-						$state.go("tabsController.stars");
-					});		
-				});
-			});		
-		});
-  }
+  	function cacheViews() {
+		// $state.go("tabsController.favorite").then(function(result) {
+  // 			$timeout(function() {
+		//   		$state.go("tabsController.players").then(function(result) {
+		// 			$timeout(function() {
+		// 				$state.go("tabsController.stars");
+		// 			});		
+		// 		});
+		// 	});		
+		// });
+		// console.log("start to tabsController.favorite");
+		// $state.go("tabsController.favorite").then(function(result) {
+  // 			$timeout(function() {  				
+		//   		$state.go("tabsController.players");
+		// 	});		
+		// });
+		$state.go("tabsController.players");
+  	}
 }])
 
 .controller('StarsCtrl', ['$scope', '$ionicSlideBoxDelegate', '$state', 'ErrorService', 'DBService', function($scope, $ionicSlideBoxDelegate, $state, ErrorService, DBService) {
@@ -39,7 +46,7 @@ angular.module('app.controllers', [])
  	$scope.stars = DBService.list().getStarList();
 	$ionicSlideBoxDelegate.update();
 	$ionicSlideBoxDelegate.slide(0);					
-	ErrorService.hideSplashScreen();
+	//ErrorService.hideSplashScreen();
 
  	$scope.showMoves = function(playerID, playerName) {
 		$state.go("tabsController.moves", {playerID: playerID, playerName: playerName});
@@ -105,63 +112,61 @@ angular.module('app.controllers', [])
 	}
 }])
 
-.controller('FavorateCtrl', ['$scope', '$state', '$ionicScrollDelegate', '$ionicListDelegate', '$ionicPopover', 'ErrorService', 'DBService', 'NativeService', function($scope, $state, $ionicScrollDelegate, $ionicListDelegate, $ionicPopover, ErrorService, DBService, NativeService) {
+.controller('FavorateCtrl', ['$scope', '$state', '$ionicScrollDelegate', '$ionicListDelegate', '$ionicPopover', 'ErrorService', 'DBService', 'NativeService', '$timeout', function($scope, $state, $ionicScrollDelegate, $ionicListDelegate, $ionicPopover, ErrorService, DBService, NativeService, $timeout) {
 	
- 	$scope.listCanSwipe = true;
- 	$scope.playingClipIndex = "";
-	$scope.clips = DBService.list().getFavoriteList();	
-	$scope.noMoreItemsAvailable = DBService.pagination().favorite().hasNoMore();
-
 	$scope.data = {  	
-    players: DBService.list().getPlayerList(),
-    moves: DBService.list().getMoveList()
-  };
- 
-  $scope.search = {
-  	selected_player: "",
-  	selected_move: "",    
-    by_player: "",
-    by_move: "",
-  };
-
-  $ionicPopover.fromTemplateUrl('templates/popover.html', {
-    scope: $scope
-  }).then(function(popover) {
-    $scope.popover = popover;
-  });
-  
-  $scope.openPopover = function($event) {
-  	$scope.search.by_player = $scope.search.selected_player;
-  	$scope.search.by_move = $scope.search.selected_move;
-    $scope.popover.show($event);
-  };
-
-  $scope.filter = function() {
-
-  	ErrorService.showLoader();
-
-  	$ionicScrollDelegate.scrollTop();
-
-  	var search = {
-  		player: $scope.search.by_player,
-  		move: $scope.search.by_move
+    	players: DBService.list().getPlayerList(),
+    	moves: DBService.list().getMoveList()
   	};
 
-  	$scope.search.selected_player = $scope.search.by_player;
-  	$scope.search.selected_move = $scope.search.by_move;
+  	$ionicPopover.fromTemplateUrl('templates/popover.html', {
+	    scope: $scope
+	}).then(function(popover) {
+	    $scope.popover = popover;
+	});
 
-  	DBService.pagination().favorite().search(search, function() {		
+	$scope.search = {
+	 	selected_player: "",
+	  	selected_move: "",    
+	    by_player: "",
+	    by_move: "",
+	};	
+
+  	$scope.listCanSwipe = true;
+ 	$scope.playingClipIndex = "";
+  
+  	$scope.openPopover = function($event) {
+	  	$scope.search.by_player = $scope.search.selected_player;
+	  	$scope.search.by_move = $scope.search.selected_move;
+	    $scope.popover.show($event);
+  	};
+
+  	$scope.filter = function() {
+
+	  	ErrorService.showLoader();
+
+	  	$ionicScrollDelegate.scrollTop();
+
+	  	var search = {
+	  		player: $scope.search.by_player,
+	  		move: $scope.search.by_move
+	  	};
+
+	  	$scope.search.selected_player = $scope.search.by_player;
+	  	$scope.search.selected_move = $scope.search.by_move;
+
+  		DBService.pagination().favorite().search(search, function() {		
 			ErrorService.hideLoader();
 		});
 
-    $scope.popover.hide();
-  };
+    	$scope.popover.hide();
+  	};
 
 	$scope.loadMore = function() { 
 		DBService.pagination().favorite().more(function() {
 			$scope.$broadcast('scroll.infiniteScrollComplete');
 		});
-  };
+  	};
 	
 	$scope.play = function(index) {		
 		$scope.playingClipIndex = index;
@@ -185,11 +190,30 @@ angular.module('app.controllers', [])
 	function setFavorite(index) {
 		DBService.updateFavorite($scope.clips[index]._id, $scope.clips[index].local, false);		
 	}
+
+	var clipLength = DBService.list().getFavoriteList().length;
+
+	if(clipLength) {
+		ErrorService.showLoader();
+	}
+
+	$timeout(function(){
+		$scope.noMoreItemsAvailable = DBService.pagination().favorite().hasNoMore();
+ 		$scope.clips = DBService.list().getFavoriteList();		
+ 		if(clipLength) ErrorService.hideLoader();	
+ 	}, 300);
 }])
 
-.controller('PlayersCtrl', ['$scope', '$state', 'DBService', function($scope, $state, DBService) {
-	
+.controller('PlayersCtrl', ['$scope', '$state', 'DBService', 'ErrorService', '$timeout', function($scope, $state, DBService, ErrorService, $timeout) {
+
+	$scope.$on("$ionicView.loaded", function() {
+    	$timeout(function() {
+    		$scope.$broadcast('scroll.refreshStart');
+    	}, 300);    
+  	});
+
 	$scope.players = DBService.list().getPlayerList();
+	ErrorService.hideSplashScreen();
 
 	$scope.doRefresh = function() {
 		console.log("start to doRefresh");

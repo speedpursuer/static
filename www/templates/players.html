@@ -5,10 +5,10 @@
             on-refresh="doRefresh()">
         </ion-refresher>
         <ion-list>
-            <ion-item ng-repeat="item in players|orderBy:'clipQty':true" class="item-avatar-left" ng-click='showMoves(item._id, item.name)'>
+            <ion-item ng-repeat="item in players | orderBy: 'clip_total': true | filter: myFilter" class="item-avatar-left" ng-click='showMoves(item._id, item.name)'>
             <img img-cache-src-avatar ic-src="{{item.avatar}}">
             <h2 class="margin-top-05em">{{item.name}}</h2>              
-            <span class="badge badge-assertive margin-top-05em">{{item.clipQty}}</span>           
+            <span class="badge badge-assertive margin-top-05em">{{item.clip_total}}</span>           
             </ion-item>
         </ion-list>
     </ion-content>

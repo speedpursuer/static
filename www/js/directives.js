@@ -19,16 +19,15 @@ angular.module('app.directives', [])
         link: function(scope, element, attributes) {
 
             scope.$on('$ionicView.beforeEnter', function() {
-                scope.$watch(attributes.hideTabs, function(value){
-                    console.log("$rootScope.hideTabs = " + value);
+                scope.$watch(attributes.hideTabs, function(value){                    
                     $rootScope.hideTabs = value;
                 });
             });
 
-            scope.$on('$ionicView.beforeLeave', function() {
-                console.log("$rootScope.hideTabs = false");
-                //$rootScope.hideTabs = false;
-            });
+            // scope.$on('$ionicView.beforeLeave', function() {
+            //     console.log("$rootScope.hideTabs = false");
+            //     $rootScope.hideTabs = false;
+            // });
         }
     };
 }])

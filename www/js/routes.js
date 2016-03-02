@@ -24,12 +24,7 @@ angular.module('app.routes', [])
     })
         
     .state('tabsController.stars', {
-      url: '/stars',
-      // resolve: {
-      //   stars: ['DBService', 'init', function(DBService, init) {
-      //     return DBService.dataFetcher().getStars();
-      //   }]
-      // },
+      url: '/stars',      
       views: {
         'tab1': {
           templateUrl: 'templates/stars.html',
@@ -57,9 +52,7 @@ angular.module('app.routes', [])
       url: '/clips/:playerID, :moveName, :moveID',
       resolve: {
         clips: ['$stateParams', 'DBService', function($stateParams, DBService) {          
-          //return DBService.getClipsByPlayer($stateParams.playerID, $stateParams.moveName);                    
           return DBService.pagination().clips().init($stateParams.playerID, $stateParams.moveID);
-          //return DBService.pagination().favorite().init();
         }]
       },
       views: {
@@ -71,13 +64,7 @@ angular.module('app.routes', [])
     })
 
     .state('tabsController.players', {
-      url: '/players',
-      /*
-      resolve: {
-        players: function($stateParams, DBService, init) {
-          return DBService.getAllPlayers_();
-        }
-      },*/
+      url: '/players',     
       views: {
         'tab2': {
           controller: 'PlayersCtrl',
@@ -105,9 +92,7 @@ angular.module('app.routes', [])
       url: '/clips2/:playerID, :moveName, :moveID',
       resolve: {
         clips: ['$stateParams', 'DBService', function($stateParams, DBService) {
-          //return DBService.getClipsByPlayer($stateParams.playerID, $stateParams.moveName);                    
           return DBService.pagination().clips().init($stateParams.playerID, $stateParams.moveID);
-          //return DBService.pagination().favorite().init();
         }]
       },
       views: {
@@ -120,14 +105,6 @@ angular.module('app.routes', [])
 
     .state('tabsController.favorite', {
       url: '/favorite',      
-      /*
-      cache: false,      
-      resolve: {
-        clips: function(DBService) {
-          return DBService.returnFavorite().init();
-        }
-      },
-      */
       views: {
         'tab4': {
           controller: 'FavorateCtrl',
@@ -136,79 +113,3 @@ angular.module('app.routes', [])
       }
     })
 }]);
-
-
-/*
- .state('tabsController.news', {      
-      url: '/news',
-      
-      resolve: {
-        clips: function(DBService) {          
-          return DBService.getAllClips();          
-        }
-      },
-      views: {
-        'tab3': {
-          controller: 'NewsCtrl',
-          templateUrl: 'templates/news.html',
-        }
-      }
-    }) 
- .state('tabsController.play', {
-      url: '/play/:fileURL, :clipID',      
-      resolve: {
-        gif: function($stateParams, ClipService) {
-          return ClipService.loadFile($stateParams.fileURL);
-        }
-      },
-      //cache: false,
-      onExit: function(ClipService, gif){
-        ClipService.destroy(gif);           
-      },
-      views: {
-        'tab1': {
-          controller: 'PlayCtrl',
-          templateUrl: 'templates/play.html',
-        }
-      }
-    })
-
-  .state('tabsController.tab2play', {
-      url: '/play/:fileURL, :clipID',     
-      
-      resolve: {
-        gif: function($stateParams, ClipService) {
-          //screen.unlockOrientation();
-        return ClipService.loadFile($stateParams.fileURL);
-        }
-      },
-      onExit: function(ClipService, gif){
-        ClipService.destroy(gif); 
-      },
-      views: {
-        'tab2': {
-          controller: 'PlayCtrl',
-          templateUrl: 'templates/play.html',
-        }
-      }
-    })
-
-  .state('tabsController.tab3play', {
-      url: '/play/:fileURL, :clipID',
-      resolve: {
-        gif: function($stateParams, ClipService) {
-          return ClipService.loadFile($stateParams.fileURL);
-        }
-      },
-      onExit: function(ClipService, gif){
-        ClipService.destroy(gif);     
-      },
-      views: {
-        'tab3': {
-          controller: 'PlayCtrl',
-          templateUrl: 'templates/play.html',
-        }
-      }
-    })
-
-*/

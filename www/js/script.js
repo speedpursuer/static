@@ -76,12 +76,7 @@ angular.module('app.routes', [])
     })
         
     .state('tabsController.stars', {
-      url: '/stars',
-      resolve: {
-        stars: ['DBService', 'init', function(DBService, init) {
-          return DBService.dataFetcher().getStars();
-        }]
-      },
+      url: '/stars',      
       views: {
         'tab1': {
           templateUrl: 'templates/stars.html',
@@ -109,9 +104,7 @@ angular.module('app.routes', [])
       url: '/clips/:playerID, :moveName, :moveID',
       resolve: {
         clips: ['$stateParams', 'DBService', function($stateParams, DBService) {          
-          //return DBService.getClipsByPlayer($stateParams.playerID, $stateParams.moveName);                    
           return DBService.pagination().clips().init($stateParams.playerID, $stateParams.moveID);
-          //return DBService.pagination().favorite().init();
         }]
       },
       views: {
@@ -123,13 +116,7 @@ angular.module('app.routes', [])
     })
 
     .state('tabsController.players', {
-      url: '/players',
-      /*
-      resolve: {
-        players: function($stateParams, DBService, init) {
-          return DBService.getAllPlayers_();
-        }
-      },*/
+      url: '/players',     
       views: {
         'tab2': {
           controller: 'PlayersCtrl',
@@ -157,9 +144,7 @@ angular.module('app.routes', [])
       url: '/clips2/:playerID, :moveName, :moveID',
       resolve: {
         clips: ['$stateParams', 'DBService', function($stateParams, DBService) {
-          //return DBService.getClipsByPlayer($stateParams.playerID, $stateParams.moveName);                    
           return DBService.pagination().clips().init($stateParams.playerID, $stateParams.moveID);
-          //return DBService.pagination().favorite().init();
         }]
       },
       views: {
@@ -172,14 +157,6 @@ angular.module('app.routes', [])
 
     .state('tabsController.favorite', {
       url: '/favorite',      
-      /*
-      cache: false,      
-      resolve: {
-        clips: function(DBService) {
-          return DBService.returnFavorite().init();
-        }
-      },
-      */
       views: {
         'tab4': {
           controller: 'FavorateCtrl',
@@ -197,18 +174,16 @@ angular.module('app.services', [])
     var service = {};    
 
     var string = {
-        dbName: "cliplay",     
-        remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",        
+        dbName: dbString? "cliplay_prod": "cliplay_dev",  
+        remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",
         file: dbString? dbString.split(",")[1]: "db.txt",
-        dbAdapter: "websql"
+        dbAdapter: "websql",
+        installFail: false
     }
     
     var db = null;
 
     var isPad = (typeof device !== 'undefined' && device.model.indexOf("iPad") !== -1)? true: false;
-
-    //db.info().then(console.log.bind(console));
-    //deleteDB();
 
     service.list = function() {
         return list;
@@ -216,7 +191,7 @@ angular.module('app.services', [])
 
     service.dataFetcher = function() {
         return dataFetcher;
-    }; 
+    };
 
     service.pagination = function() {
         return pagination;
@@ -232,6 +207,11 @@ angular.module('app.services', [])
         playerList: [],
         moveList: [],
         clipList: [],
+        starList: [],
+
+        getStarList: function(){
+            return this.starList;
+        },
 
         setClipList: function(_list) {                 
             copyList(this.clipList, _list);
@@ -297,72 +277,75 @@ angular.module('app.services', [])
                     return;
                 }
             }
-        },
-
-        getMoves: function() {
-            return db.find({
-                selector: {type: 'move'}
-            });        
-        },
+        },     
 
         getAllPlayers: function() {       
             return retrieveAllPlayers();
         },
     };
 
-    var dataFetcher = {
-        getStars: function() {
-            return db.find({
-                selector: {type: 'player', star: true}
-            });        
-        },
+    var dataFetcher = {        
 
         getMoves: function() {
+
             var deferred = $q.defer();
 
-            db.find({
-                selector: {type: 'move'},
-                fields: ['_id', 'move_name', 'image']
-            }).then(function(result){
-                list.setMoveList(result.docs);
-                deferred.resolve("Moves retrieved");
-            }).catch(function(){
-                deferred.reject("Moves not retrieved");
+            db.allDocs({
+                include_docs: true,
+                startkey: "move",
+                endkey: "move\uffff"            
+            }).then(function (result) {
+                                    
+                result = result.rows.map(function(row) {                   
+                    return row.doc;
+                });
+
+                list.setMoveList(result);
+
+                deferred.resolve("All moves retrieved");
+
+            }).catch(function (err) {
+                deferred.reject(err);
             });
 
             return deferred.promise;
         },
 
         getMovesByPlayer: function(playerID) {
-            var deferred = $q.defer();
-            var option = {startkey: [playerID], endkey: [playerID, {}], reduce: true, group: true};
-            
-            db.query('views/moves', option).then(function (result) {
-                          
-                var moves = [];
+            var deferred = $q.defer();            
 
-                for(i in result.rows) {                                
-                    moves.push({_id: result.rows[i].key[4], name: result.rows[i].key[1], image: result.rows[i].key[2], desc: result.rows[i].key[3], clipQty: result.rows[i].value});
+            db.get(playerID).then(function(result){
+
+                var moves = result.clip_moves;
+
+                var keys = [];
+
+                for(i in moves) {
+                    if(parseInt(moves[i]) > 0) keys.push(i);
                 }
-                deferred.resolve(moves);
+                
+                db.allDocs({
+                    include_docs: true,
+                    keys: keys
+                }).then(function (result) {
+                                        
+                    result = result.rows.map(function(row) {
+                        row.doc.clipQty = moves[row.doc._id];   
+                        row.doc.name = row.doc.move_name;
+                        return row.doc;
+                    });
 
-            }).catch(function (err) {
-                deferred.reject(err);
-            }); 
+                    deferred.resolve(result);
+
+                }).catch(function (err) {
+                    deferred.reject(err);
+                });
+            }).catch(function(){
+
+            });          
 
             return deferred.promise;       
-        },
-
-        testMovesByPlayer: function(playerID) {
-            var deferred = $q.defer();
-            var option = {startkey: [playerID], endkey: [playerID, {}], reduce: true, group: true, limit: 0};
-            
-            db.query('views/moves', option).finally(function() {
-                deferred.resolve("move retrieved");
-            }); 
-
-            return deferred.promise;       
-        },        
+        },    
     };      
 
     var pagination = {       
@@ -380,8 +363,8 @@ angular.module('app.services', [])
             end: {noMore: true},
             limit: isPad? 12: 7,    
             descending: true,           
-            init: function(playerID, moveID) {
-                this.options = {descending : this.descending, limit : this.limit, endkey: [playerID, moveID], startkey: [playerID, moveID, {}], reduce: true, group: true};                                
+            init: function(playerID, moveID) {                
+                this.options = {descending : this.descending, include_docs: true, limit : this.limit, endkey: "clip_" + playerID + "_" + moveID, startkey: "clip_" + playerID + "_" + moveID + "\uffff"};                                
                 list.resetClipList();
                 this.end.noMore = true;
                 return this.getClips();
@@ -407,38 +390,27 @@ angular.module('app.services', [])
                 var that = this;
 
                 var _options = that.options;
-             
-                db.query('views/clips', _options).then(function (result) {
+                
+                db.allDocs(_options).then(function (result) {
 
                     if (result && result.rows.length > 0) {
 
                         _options.startkey = result.rows[result.rows.length - 1].key;
-                        //_options.skip = 1;                                              
-                                                        
-                        var keys = [];
-                        
-                        for(i in result.rows) {
-                            keys.push(result.rows[i].value);
-                        }
 
-                        db.query('views/local', {include_docs : true, keys: keys}).then(function (result) {
-                                                           
-                            result = result.rows.map(function(row) {
-                                var thumb = "", favorite = false;
-                                if (row.doc) {
-                                    thumb = row.doc.thumb;
-                                    favorite = row.doc.favorite;
-                                }
-                                return {
-                                    _id: row.id,
-                                    name: row.value.name,
-                                    desc: row.value.desc,
-                                    image: row.value.image,
-                                    local: row.value.local,
-                                    thumb: thumb,
-                                    favorite: favorite                        
-                                };
-                            });
+                        var keys = [];
+
+                        result = result.rows.map(function(row) {
+                            keys.push(row.doc.local);
+                            return row.doc;
+                        });                        
+
+                        db.allDocs({keys: keys, include_docs: true}).then(function (r) {                            
+
+                            for(i in result) {
+                                var local = r.rows[i];                                                    
+                                result[i].thumb = local.doc? local.doc.thumb: "";
+                                result[i].favorite = local.doc? local.doc.favorite: false;
+                            }
 
                             if(result.length < that.limit) {
                                 that.end.noMore = true;
@@ -452,39 +424,21 @@ angular.module('app.services', [])
                             
                             list.setClipList(result);
                             deferred.resolve("More data fetched");
-                        }).catch(function (err) {                
-                            deferred.reject(err);                
-                        });
+
+                        }).catch(function(err){
+                            deferred.reject(err);
+                        });                        
                     }else{                       
                         that.end.noMore = true;            
                         deferred.resolve("No more data");             
-                    }
+                    }                                                        
+
                 }).catch(function (err) {
                     deferred.reject(err);
                 });
 
                 return deferred.promise;
             },
-
-            testClips: function(playerID, moveID) {
-
-                var deferred = $q.defer();
-
-                var options = {descending: true, limit: 1, endkey: [playerID, moveID], startkey: [playerID, moveID, {}], reduce: true, group: true};                
-             
-                db.query('views/clips', options).then(function (result) {
-                    
-                    db.query('views/local', {include_docs : true, key: result.rows[0].value})
-                    .finally(function () {
-                        deferred.resolve("data fetched");
-                    });
-
-                }).catch(function (err) {
-                    deferred.resolve("data not fetched");
-                });
-
-                return deferred.promise;
-            }
         },
 
         favoritePg: {
@@ -505,20 +459,26 @@ angular.module('app.services', [])
             },
             search: function(search, callback) {
 
-                if(!search) search = {};                
+                if(!search) search = {};          
+
+                this.options = {descending : this.descending, limit : this.limit, include_docs: true};                
 
                 if(search.player && search.move) {
-                    this.view = "favorite_player_move";                   
-                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true, search.player, search.move], startkey: [true, search.player, search.move, {}]};                
+                    this.view = "favorite_player_move";                                      
+                    this.options.startkey = [true, search.player, search.move, {}];
+                    this.options.endkey = [true, search.player, search.move];
                 }else if(search.player) {
-                    this.view = "favorite_player";
-                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true, search.player], startkey: [true, search.player, {}]};                
+                    this.view = "favorite_player";                    
+                    this.options.startkey = [true, search.player, {}];
+                    this.options.endkey = [true, search.player];
                 }else if(search.move) {
-                    this.view = "favorite_move";
-                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true, search.move], startkey: [true, search.move, {}]};
+                    this.view = "favorite_move";            
+                    this.options.startkey = [true, search.move, {}];
+                    this.options.endkey = [true, search.move];
                 }else {
-                    this.view = "favorite";
-                    this.options = {descending : this.descending, limit : this.limit, include_docs: true, endkey: [true], startkey: [true, {}]};    
+                    this.view = "favorite";                    
+                    this.options.startkey = [true, {}];
+                    this.options.endkey = [true];
                 }
 
                 if(search.noResult) {
@@ -530,10 +490,7 @@ angular.module('app.services', [])
                 this.end.noMore = true;
 
                 this.more(callback);                             
-            },   
-            testFavorite: function() {
-                //this.search()
-            },
+            },           
             more: function(callback) {              
                 this.getFavorite()
                 .catch(function() {
@@ -560,7 +517,7 @@ angular.module('app.services', [])
 
                 var _options = that.options;
 
-                db.query('views/' + that.view, _options).then(function (result) {
+                db.query(that.view, _options).then(function (result) {
 
                     if (result && result.rows.length > 0) {
 
@@ -613,13 +570,10 @@ angular.module('app.services', [])
     var remoteDB = {
         syncRemote: function(callback) {
             syncFromRemote().then(function(result) {
-                if(result.docs_written > 0) {
-                    //retrieveAllPlayers();
-                    //retrieveAllMoves();
-                    //verifyView();
-                    reIndex().then(refreshAllPlayers).finally(function(){
+                if(result.docs_written > 0) {                  
+                    refreshAllPlayers().finally(function(){
                         if(callback) callback();        
-                    });
+                    });                  
                 }else{                    
                     if(callback) callback();
                 }
@@ -643,77 +597,6 @@ angular.module('app.services', [])
 
     service.put = function(doc) {
         return db.put(doc);
-    };
-
-    var clipUpdator = {
-        localClipID: "",
-        post_fix: ".jpg",
-        updateFavorite: function() {
-            
-        },
-
-        updateThumb: function() {
-
-        },
-
-        updateBoth: function() {
-            var post_fix = ".jpg";
-
-            var updateList = function(list) {
-                if(list && list.length > 0) {
-                    for(i in list) {
-                        if(list[i]._id == clipID) {                
-                            list[i].thumb = list[i].image + post_fix;
-                            list[i].favorite = favorite;
-                            return;
-                        }
-                    }        
-                }            
-            };
-
-            db.get(clipID).then(function(clip) {
-                db.get(clip.local).then(function(local) {
-                    var date = new Date();
-                    local.thumb = clip.image + post_fix;
-                    local.favorite = favorite;                
-                    local.timestamp = "" + date.getTime();
-                    db.put(local);
-                }).catch(function(){
-                    var date = new Date();
-                    var local = {
-                        _id: clip.local,
-                        type: "local",
-                        favorite: favorite,
-                        thumb: clip.image + post_fix,
-                        clip: clipID,
-                        player: clip.player,
-                        move: clip.move,
-                        timestamp: "" + date.getTime()            
-                    }
-                    db.put(local);
-                });  
-
-                if(favorite) {
-                    list.addFavoriteToList(clipID, clip.image + post_fix);
-                } else {
-                    list.removeFavoriteFromList(clipID);
-                }                                  
-            });
-
-            updateList(curClipList);    
-        },
-
-        updateClipList: function(list, flag1, flag2) {
-            if(list && list.length > 0) {
-                for(i in list) {
-                    if(list[i].local == localClipID) {                                            
-                        list[i].thumb = list[i].image + post_fix;
-                        list[i].favorite = favorite;
-                        return;
-                    }
-                }        
-            }  
-        }
     };
 
     service.updateBoth = function(clipID, favorite, curClipList) {
@@ -851,24 +734,26 @@ angular.module('app.services', [])
     };
 
     service.init = function() {        
-
+        //console.log("start to init");
         var deferred = $q.defer();
-    
-        createDB();
+
+        //dataTransfer.transfer(); return;
+        createDB();        
         
         isDBInstalled()
         .then(function() {        
             syncData(deferred, false);
         }).catch(function(e) {
+            //ErrorService.showProgress();          
             cleanDB()
             .then(loadDBDump)
             .then(markInstalled)
             .then(function() {
-                //console.log("DB installed");
+                //console.log("DB installed");                
                 syncData(deferred, true);
             }).catch(function (err){                
-                console.log("install err, details = " + err);
-                initFail();
+                console.log("install err, details = " + err);                
+                installFail();
                 deferred.reject("Err in creating DB" + err);                            
             });
         });
@@ -876,121 +761,36 @@ angular.module('app.services', [])
         return deferred.promise;        
     };
 
-    function bootstrap(deferred, callback) {       
-        retrieveLists()
-        .then(reIndex)
-        .then(function() {                   
-            deferred.resolve("data prefetched");
-            if(callback) callback();
-        }).catch(function(err){                    
-            initFail();
-            deferred.reject("Err in getting init data: " + err);                     
-        });
-    }
-
-    function bootstrapForInstall(deferred, callback) {       
-        retrieveListsForInstall()
-        .then(reIndexForInstall)
-        .then(loadImgs)
-        .then(function() {                 
-            deferred.resolve("data prefetched");
-            if(callback) callback();
-        }).catch(function(err){                    
-            initFail();
-            deferred.reject("Err in getting init data: " + err);                     
-        });
-    }
-
     function syncData(deferred, install) {
-        syncFromRemote().then(function(result){
-            //console.log("syncFromRemote success");
-            if(install) {
-                bootstrapForInstall(deferred);
-            }else{
-                bootstrap(deferred);    
-            }                                                   
-        }).catch(function(){  
-            //console.log("syncFromRemote fail");
-            if(install) {
-                bootstrapForInstall(deferred, function(){
-                    syncFail();
-                })
-            }else{
-                bootstrap(deferred, function(){
-                    syncFail();
-                })
-            }
-        });   
+        if(install) {
+            bootstrapForInstall(deferred);
+        }else{
+            bootstrap(deferred);    
+        } 
     }
 
-    service.init_ = function() {        
-
-        var deferred = $q.defer();
-    
-        createDB();
-        
-        isDBInstalled()
-        .then(function() {
-            syncFromRemote().then(function(result){                                           
-                retrieveLists()
-                .then(reIndex)
-                .then(function() {                   
-                    deferred.resolve("DB Existed");
-                }).catch(function(err){                    
-                    initFail();
-                    deferred.reject("Err in getting init data: " + err);                     
-                });
-            }).catch(function(){                                   
-                retrieveLists()
-                .then(reIndex)
-                .then(function() {
-                    deferred.resolve("DB Existed");
-                    syncFail();
-                }).catch(function(err){                    
-                    initFail();
-                    deferred.reject("Err in getting init data: " + err);                     
-                });
-            });            
-        }).catch(function(e) {
-            //console.log("Cannot find install flag due to: " + e);
-
-            if(isCordova() && navigator.connection.type === Connection.NONE) {
-                //console.log("No network connect");
-                installFail();
-                deferred.reject("No network connect");                            
-            }else{
-                //ErrorService.showProgress();
-                cleanDB()
-                //.then(loadDBDump)
-                .then(syncFromRemote)      
-                .then(setupView)
-                .then(setUpIndex)   
-                .then(retrieveListsForInstall)
-                .then(reIndexForInstall)
-                .then(loadImgs)          
-                .then(markInstalled)
-                .then(function() {
-                    deferred.resolve("DB Created");
-                }).catch(function (err){                
-                    console.log("install err, details = " + err);
-                    installFail();
-                    deferred.reject("Err in creating DB" + err);                            
-                });      
-            }
+    function bootstrap(deferred, callback) {       
+        retrieveLists().then(function() {                   
+            deferred.resolve("data prefetched");
+            if(callback) callback();
+        }).catch(function(err){                    
+            initFail();
+            deferred.reject("Err in getting init data: " + err);                     
         });
+    }
 
-        return deferred.promise;        
-    };
-
-    function setupIndexes() {        
-        var list = [];
-        list.push(setupView());
-        list.push(setUpIndex());
-        return executePromises(list);
+    function bootstrapForInstall(deferred, callback) {     
+        
+        retrieveListsForInstall().then(function() {                 
+            deferred.resolve("data prefetched");
+            if(callback) callback();
+        }).catch(function(err){                    
+            initFail();
+            deferred.reject("Err in getting init data: " + err);                     
+        });
     }
 
     function retrieveLists(isInstall) {
-        //console.log("Start to retrieveLists");
         var list = [];
         list.push(retrieveAllPlayers());
         list.push(retrieveAllMoves());
@@ -1003,20 +803,17 @@ angular.module('app.services', [])
     }   
 
     function loadImgs() {
-        //console.log("Start to loadPlayerImg");
         var list = [];
         list.push(loadMoveImg());
         list.push(loadPlayerImg());        
         return executePromises(list);
     }
 
-    function loadMoveImg() {
-        //console.log("ready for loadMoveImg");
+    function loadMoveImg() {       
         return FileCacheService.cacheFiles(list.moveList);
     }
 
     function loadPlayerImg() {
-        //console.log("ready for loadPlayerImg");
         return FileCacheService.cacheAvatar(list.playerList);
     }
 
@@ -1029,93 +826,54 @@ angular.module('app.services', [])
 
         return $q.all(promises);
     }
-    
-    function verifyView() {        
-        //console.log("Start to verifyView");
-        var deferred = $q.defer();      
 
-        var playerID = list.getPlayerList()[0]._id;    
+    function buildIndexes(install) {
 
-        dataFetcher.getMovesByPlayer(playerID).then(function(result){
-            var moveID = result[0]._id;
-            pagination.clips().init(playerID, moveID).then(function(result) {
-                var search = {
-                    player: playerID,
-                    move: moveID
-                };
-                pagination.favorite().init(search).then(function(result) {
-                    //console.log("Index verified");
-                    deferred.resolve("Index verified");
-                }).catch(function(err) {
-                    deferred.reject(err);
-                });                        
-            }).catch(function(err) {
-                deferred.reject(err);
-            });
-        }).catch(function(err) {
-            deferred.reject(err);
-        });
-        return deferred.promise;        
-    }
+        var list = [];
 
-    function reIndex(install) {       
-        
-        var playerID = list.getPlayerList()[0]._id,
-
-            moveID = list.getMoveList()[1]._id,
-
-            promiseList = [];
-
-        promiseList.push(dataFetcher.testMovesByPlayer(playerID));       
-
-        promiseList.push(pagination.clips().testClips(playerID, moveID));
+        //var views = ['players', 'allMoves', 'moves', 'clips', 'local'];
+        var views = ['moves', 'clips', 'local'];
 
         if(install) {
-            var search = {                    
-                    noResult: true                  
-                },
-                search1 = {
-                    player: playerID,
-                    noResult: true                  
-                },
-                search2 = {
-                    move: moveID,
-                    noResult: true
-                },
-                search3 = {
-                    player: playerID,                 
-                    move: moveID,
-                    noResult: true
-                };
-            promiseList.push(pagination.favorite().search(search));
-            promiseList.push(pagination.favorite().search(search1));
-            promiseList.push(pagination.favorite().search(search2));
-            promiseList.push(pagination.favorite().search(search3));
+            //views = ['players', 'allMoves', 'moves', 'clips', 'local', 'favorite', 'favorite_player_move', 'favorite_player', 'favorite_move'];
+            views = ['moves', 'clips', 'local', 'favorite', 'favorite_player_move', 'favorite_player', 'favorite_move'];
         }
 
-        return executePromises(promiseList);
+        for(i in views) {
+            list.push(db.query(views[i], {stale: 'update_after'}));
+        }
+
+        return executePromises(list);
     }
 
-    function reIndexForInstall() {
-        //console.log("Start to reIndexForInstall");
-        return reIndex(true);
+    function buildIndexesForInstall() {    
+        return buildIndexes(false);
     }
 
     function initFail() {
-        ErrorService.showAlert("启动遇到小问题", "请重启再试。", false);         
+        ErrorService.showAlert("启动遇到问题", "请您重新下载安装。", false);         
     }
 
     function installFail() {
-        ErrorService.showAlert("启动遇到小问题", "请检查网络后再试。", false);         
+        string.installFail = true;
+        ErrorService.showAlert("安装遇到小问题", "请点击重试。", true);       
     }
 
     function syncFail() {
-        if(isCordova() && navigator.connection.type === Connection.NONE) {
+        if(!hasNetwork()) {
             ErrorService.showAlert("无法同步最新数据", "请确认互联网连接。", false);            
         }else{
             ErrorService.showAlert("无法同步最新数据", "请稍候再试。", false);
         }        
     }
+
+    function hasNetwork() {
+        if(!isCordova()) {
+            return true;
+        }else {
+            return navigator.connection.type !== Connection.NONE   
+        }      
+    }    
 
     function retrieveFavorites() {
         //console.log("ready for retrieveFavorites");
@@ -1131,35 +889,25 @@ angular.module('app.services', [])
         //console.log("ready for retrieveAllPlayers");
         var deferred = $q.defer();
 
-        db.query('views/players', {reduce: true, group: true, group_level: 2}).then(function (result) {            
-            
-            var keys = [], qtys = [];
-            
-            for(i in result.rows) {
-                keys.push(result.rows[i].key);
-                qtys.push(result.rows[i].value);
+        db.allDocs({
+            include_docs: true,
+            startkey: "player",
+            endkey: "player\uffff"            
+        }).then(function (result) {
+                                
+            result = result.rows.map(function(row) {
+                return row.doc;
+            });
+
+            for(i in result) {                
+                if (result[i].star) {
+                    list.starList.push(result[i]);
+                }               
             }
 
-            db.allDocs({
-                include_docs: true,
-                keys: keys
-            }).then(function (result) {
-                                
-                for(i in result.rows) {
-                    result.rows[i].doc.clipQty = qtys[i];
-                }     
+            list.setPlayerList(result);
 
-                result = result.rows.map(function(row) {
-                    return row.doc;
-                });
-
-                list.setPlayerList(result);
-
-                deferred.resolve("All players retrieved");
-
-            }).catch(function (err) {
-                deferred.reject(err);
-            });
+            deferred.resolve("All players retrieved");
 
         }).catch(function (err) {
             deferred.reject(err);
@@ -1172,45 +920,28 @@ angular.module('app.services', [])
 
         var deferred = $q.defer();
 
-        db.query('views/players', {reduce: true, group: true, group_level: 2}).then(function (result) {            
-            
-            var keys = [], qtys = [];
+        db.allDocs({
+            include_docs: true,
+            startkey: "player",
+            endkey: "player\uffff"            
+        }).then(function (result) {
+
             var players = list.playerList;
-            
+
             for(i in result.rows) {
                 
                 var index = findIndex(players, result.rows[i].key);    
 
                 if(index == -1) {
-                    keys.push(result.rows[i].key);
-                    qtys.push(result.rows[i].value);                
+                    insertArray(players, result.rows[i].doc);
                 } else {
-                    if(players[index].clipQty != result.rows[i].value) {
-                        players[index].clipQty = result.rows[i].value;
+                    if(players[index].clip_total != result.rows[i].doc.clip_total) {
+                        players[index].clip_total = result.rows[i].doc.clip_total;
                     }    
                 }             
             }
 
-            if (keys.length > 0) {
-                db.allDocs({
-                    include_docs: true,
-                    keys: keys
-                }).then(function (result) {
-                                    
-                    for(i in result.rows) {
-                        result.rows[i].doc.clipQty = qtys[i];
-                        insertArray(players, result.rows[i].doc);
-                    }
-
-                    deferred.resolve("All players refreshed");
-
-                }).catch(function (err) {
-                    deferred.reject(err);
-                });
-
-            }else {
-                deferred.resolve("All players refreshed");
-            }
+            deferred.resolve("All players refreshed");
 
         }).catch(function (err) {
             deferred.reject(err);
@@ -1236,14 +967,10 @@ angular.module('app.services', [])
     }
 
     function cleanDB() {      
-        //console.log("Start to cleanDB");
         var deferred = $q.defer();
         db.destroy().then(function() {
             createDB();
-            deferred.resolve("DB recreated");
-            // $timeout(function(){
-            //     deferred.resolve("DB recreated");
-            // },10);         
+            deferred.resolve("DB recreated");              
         }).catch(function() {
             deferred.reject("DB destroy err");
         });
@@ -1254,38 +981,20 @@ angular.module('app.services', [])
         if(db) {
             db = null;
         }
-        //console.log("Start to createDB");
-        db = pouchdb.create(string.dbName, {size: 40, adapter: string.dbAdapter, auto_compaction: true});
-        //deleteDB();
-        //db = pouchdb.create(string.dbName, {adapter: string.dbAdapter});        
-        //db = pouchdb.create(string.dbName, {size: 40, adapter: string.dbAdapter, auto_compaction: false});
-        //db = pouchdb.create(string.dbName, {auto_compaction: true});
-        //db.info().then(console.log.bind(console));
+        db = pouchdb.create(string.dbName, {size: 40, adapter: string.dbAdapter, auto_compaction: false});
+        //deleteDB();        
     }
 
-    function syncFromRemote() {
-        //console.log("Start to SyncFromRemote from: " + string.remoteURL + string.dbName);        
-        return db.replicate.from(string.remoteURL + string.dbName, {timeout: 10000});
-    }
-
-    function syncToRemote() {
-        //console.log("Start to syncToRemote from: " + string.remoteURL + string.dbName);
-        return db.replicate.to(string.remoteURL + string.dbName, {timeout: 3000});   
-    }
+    function syncFromRemote() {     
+        return db.replicate.from(string.remoteURL + string.dbName, {timeout: 5000});
+    }    
 
     function loadDBDump() {
         //console.log("Start to loadDBDump");
         
         var deferred = $q.defer();      
 
-        if(isCordova()) {            
-            // $.get(string.file, function(res) {   
-            //     console.log("string.remoteURL + string.dbName: " + string.remoteURL + string.dbName);
-            //     deferred.resolve(db.load(res, {
-            //         proxy: string.remoteURL + string.dbName
-            //     }));
-            //     // deferred.resolve(db.load(res));
-            // });
+        if(isCordova()) {           
 
             window.resolveLocalFileSystemURL(cordova.file.applicationDirectory + "/" + string.file, 
                 function(fileEntry){
@@ -1294,10 +1003,8 @@ angular.module('app.services', [])
                         var reader = new FileReader();
 
                         reader.onloadend = function(e) {
-
-                            deferred.resolve(db.load(this.result, {
-                                //proxy: string.remoteURL + string.dbName
-                            }));                            
+                            var option = (!string.installFail && hasNetwork()) ? {proxy: string.remoteURL + string.dbName}: {};                          
+                            deferred.resolve(db.load(this.result, option));                       
                         }
 
                         reader.readAsText(file);
@@ -1321,96 +1028,52 @@ angular.module('app.services', [])
         return (typeof cordova !== 'undefined' || typeof phonegap !== 'undefined');
     };
 
-    function setupView() {
-        //console.log("Start to setupView");
+    function createDesignDoc(name, mapFunction, reduce) {
         var ddoc = {
-            _id: '_design/views',
-            views: {
-                players: {
-                    map: function(doc) {
-                        var player, clip;
-                        if (doc.move_name && doc.clip_player) {
-                            for (clip in doc.clip_player) {
-                                player = doc.clip_player[clip];                                
-                                emit(player, clip);
-                                //emit([player, clip], 1);
-                            }
-                        }
-                    }.toString(),
-                    reduce: "_count"                
-                },
-                moves: {
-                    map: function(doc) {
-                        var player, clip;
-                        if (doc.move_name && doc.clip_player && doc.image) {
-                            for (clip in doc.clip_player) {
-                                player = doc.clip_player[clip];                                
-                                emit([player, doc.move_name, doc.image, doc.desc, doc._id], 1);
-                            }
-                        }
-                    }.toString(),
-                    reduce: function(key, values, rereduce) {
-                        return sum(values);
-                    }.toString()
-                },
-                clips: {
-                    map: function(doc) {
-                        var player, clip;
-                        if (doc.move_name && doc.clip_player) {
-                            for (clip in doc.clip_player) {
-                                player = doc.clip_player[clip];
-                                emit([player, doc._id, clip], clip);
-                            }
-                        }
-                    }.toString()                     
-                },
-                local: {
-                    map: function(doc) {      
-                        if (doc.type === 'clip') {
-                            emit(doc._id, {_id : doc.local, desc: doc.desc, name: doc.name, image: doc.image, local: doc.local});
-                        }
-                    }.toString()
-                },
-                favorite: {
-                    map: function(doc) { 
-                        if (doc.type === 'local') {
-                            emit([doc.favorite, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
-                        }
-                    }.toString()
-                },
-                favorite_player_move: {
-                    map: function(doc) { 
-                        if (doc.type === 'local') {
-                            emit([doc.favorite, doc.player, doc.move, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
-                        }
-                    }.toString()
-                },
-                favorite_player: {
-                    map: function(doc) { 
-                        if (doc.type === 'local') {
-                            emit([doc.favorite, doc.player, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
-                        }
-                    }.toString()
-                },
-                favorite_move: {
-                    map: function(doc) { 
-                        if (doc.type === 'local') {
-                            emit([doc.favorite, doc.move, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
-                        }
-                    }.toString()
-                }
-            }   
+            _id: '_design/' + name,
+            views: {}
         };
-        return db.put(ddoc);
-    }    
+        ddoc.views[name] = { map: mapFunction.toString() };
+        if(reduce) {
+            ddoc.views[name].reduce = reduce;
+        }
+        return ddoc;
+    }
 
-    function setUpIndex() {
-        //console.log("Start to setupIndex");
-    	return db.createIndex({
-    		index: {
-    			fields: ['type']
-    		}
-		});
+    function setupView(_db) {
+        var designDocs = [];        
+
+        designDocs.push(createDesignDoc('favorite', function (doc) {
+            if (doc.type === 'local') {
+                emit([doc.favorite, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
+            }
+        }));
+
+        designDocs.push(createDesignDoc('favorite_player_move', function (doc) {
+            if (doc.type === 'local') {
+                emit([doc.favorite, doc.player, doc.move, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
+            }
+        }));
+
+        designDocs.push(createDesignDoc('favorite_player', function (doc) {
+            if (doc.type === 'local') {
+                emit([doc.favorite, doc.player, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
+            }
+        }));
+
+        designDocs.push(createDesignDoc('favorite_move', function (doc) {
+            if (doc.type === 'local') {
+                emit([doc.favorite, doc.move, doc.timestamp], {_id : doc.clip, thumb: doc.thumb, timestamp: doc.timestamp});
+            }
+        }));
+
+        var list = [];
+
+        for(i in designDocs) {
+            list.push(_db.put(designDocs[i]));
+        }
+
+        return executePromises(list);
     }
     
     function markInstalled() {
@@ -1585,29 +1248,7 @@ angular.module('app.services', [])
 .factory('ErrorService', ['$rootScope', '$cordovaSplashscreen', '$ionicPopup', '$ionicLoading', '$timeout', 'NativeService', function($rootScope, $cordovaSplashscreen, $ionicPopup, $ionicLoading, $timeout, NativeService) {
                 
          
-    var service = {};
-                
-    // $ionicModal.fromTemplateUrl('templates/modal.html', {
-    //     scope: $rootScope,
-    //     animation: 'slide-in-up',
-    //     backdropClickToClose: false,
-    //     hardwareBackButtonClose: false
-    // }).then(function(modal) {
-    //     $rootScope.modal = modal;
-    // });
-
-    // service.showModal = function() {
-    //     if(!$rootScope.modal.isShown()){
-    //         $rootScope.modal.show();    
-    //     }        
-    // };
-
-    // service.hideModal = function() {
-    //     if($rootScope.modal.isShown()) {
-    //         $rootScope.modal.hide();
-    //         $rootScope.modal.remove();    
-    //     }
-    // };
+    var service = {};        
 
     service.showSplashScreen = function() {
         $cordovaSplashscreen.show();
@@ -1616,7 +1257,7 @@ angular.module('app.services', [])
     service.hideSplashScreen = function() {
         $timeout(function() {
             $cordovaSplashscreen.hide();
-        }, 500);   
+        });   
     };
 
     service.showProgress = function() {        
@@ -1627,13 +1268,7 @@ angular.module('app.services', [])
 
     service.showAlert = function(title, desc, retry) {
         
-        NativeService.showMessage(title, desc? desc: "请稍后重试", retry);
-        // var alertPopup = $ionicPopup.alert({
-        //     title: title
-        // });
-
-        // alertPopup.then(function(res) {
-        // });                
+        NativeService.showMessage(title, desc? desc: "请稍后重试", retry);              
     };
 
     service.showDownLoader = function() {
@@ -1643,10 +1278,11 @@ angular.module('app.services', [])
         });
     };
     
-    service.showLoader = function() {
+    service.showLoader = function(duration) {
         $ionicLoading.show({
             template: '<ion-spinner icon="crescent" class="spinner-assertive"></ion-spinner>',
-            hideOnStateChange: false
+            hideOnStateChange: false,
+            duration: duration? duration: 0
         });
     };
 
@@ -1664,39 +1300,24 @@ angular.module('app.controllers', [])
 
 .controller('RootCtrl', ['$scope', '$state', '$timeout', function($scope, $state, $timeout) {
 	
-	(function() {		
+	(function() {
 		cacheViews();
 	}());	  
 
 	$scope.retry = function() {
-  	cacheViews();  	
-  };
+  		cacheViews();  	
+  	};
 
-  function cacheViews() {  	
-		$state.go("tabsController.favorite").then(function(result) {
-  		$timeout(function() {
-		  	$state.go("tabsController.players").then(function(result) {
-					$timeout(function() {
-						$state.go("tabsController.stars");
-					});		
-				});
-			});		
-		});
-  }
+  	function cacheViews() {		
+		$state.go("tabsController.players");
+  	}
 }])
 
-.controller('StarsCtrl', ['$scope', '$ionicSlideBoxDelegate', '$state', 'ErrorService', 'stars', function($scope, $ionicSlideBoxDelegate, $state, ErrorService, stars) {
+.controller('StarsCtrl', ['$scope', '$ionicSlideBoxDelegate', '$state', 'ErrorService', 'DBService', function($scope, $ionicSlideBoxDelegate, $state, ErrorService, DBService) {
   	
-	(function() {
-		renderPlayList(stars);		
-	}());	  
-
- 	function renderPlayList(results) {
- 		$scope.stars = results.docs;
-		$ionicSlideBoxDelegate.update();
-		$ionicSlideBoxDelegate.slide(0);					
-		ErrorService.hideSplashScreen();
- 	}
+ 	$scope.stars = DBService.list().getStarList();
+	$ionicSlideBoxDelegate.update();
+	$ionicSlideBoxDelegate.slide(0);						
 
  	$scope.showMoves = function(playerID, playerName) {
 		$state.go("tabsController.moves", {playerID: playerID, playerName: playerName});
@@ -1704,7 +1325,7 @@ angular.module('app.controllers', [])
 }])
    
 .controller('ClipsCtrl', ['$scope', '$stateParams', '$ionicListDelegate', 'DBService', 'NativeService' ,function($scope, $stateParams, $ionicListDelegate, DBService, NativeService) {
-	
+
 	$scope.clips = DBService.list().getClipList();	
 	$scope.noMoreItemsAvailable = DBService.pagination().clips().hasNoMore();
 
@@ -1717,7 +1338,7 @@ angular.module('app.controllers', [])
 		DBService.pagination().clips().more(function(){
 			$scope.$broadcast('scroll.infiniteScrollComplete');
 		});
-  };
+  	};
 
 	$scope.play = function(index) {		
 		$scope.playingClipIndex = index;
@@ -1753,63 +1374,61 @@ angular.module('app.controllers', [])
 	}
 }])
 
-.controller('FavorateCtrl', ['$scope', '$state', '$ionicScrollDelegate', '$ionicListDelegate', '$ionicPopover', 'ErrorService', 'DBService', 'NativeService', function($scope, $state, $ionicScrollDelegate, $ionicListDelegate, $ionicPopover, ErrorService, DBService, NativeService) {
+.controller('FavorateCtrl', ['$scope', '$state', '$ionicScrollDelegate', '$ionicListDelegate', '$ionicPopover', 'ErrorService', 'DBService', 'NativeService', '$timeout', function($scope, $state, $ionicScrollDelegate, $ionicListDelegate, $ionicPopover, ErrorService, DBService, NativeService, $timeout) {
 	
- 	$scope.listCanSwipe = true;
- 	$scope.playingClipIndex = "";
-	$scope.clips = DBService.list().getFavoriteList();	
-	$scope.noMoreItemsAvailable = DBService.pagination().favorite().hasNoMore();
-
 	$scope.data = {  	
-    players: DBService.list().getPlayerList(),
-    moves: DBService.list().getMoveList()
-  };
- 
-  $scope.search = {
-  	selected_player: "",
-  	selected_move: "",    
-    by_player: "",
-    by_move: "",
-  };
-
-  $ionicPopover.fromTemplateUrl('templates/popover.html', {
-    scope: $scope
-  }).then(function(popover) {
-    $scope.popover = popover;
-  });
-  
-  $scope.openPopover = function($event) {
-  	$scope.search.by_player = $scope.search.selected_player;
-  	$scope.search.by_move = $scope.search.selected_move;
-    $scope.popover.show($event);
-  };
-
-  $scope.filter = function() {
-
-  	ErrorService.showLoader();
-
-  	$ionicScrollDelegate.scrollTop();
-
-  	var search = {
-  		player: $scope.search.by_player,
-  		move: $scope.search.by_move
+    	players: DBService.list().getPlayerList(),
+    	moves: DBService.list().getMoveList()
   	};
 
-  	$scope.search.selected_player = $scope.search.by_player;
-  	$scope.search.selected_move = $scope.search.by_move;
+  	$ionicPopover.fromTemplateUrl('templates/popover.html', {
+	    scope: $scope
+	}).then(function(popover) {
+	    $scope.popover = popover;
+	});
 
-  	DBService.pagination().favorite().search(search, function() {		
+	$scope.search = {
+	 	selected_player: "",
+	  	selected_move: "",    
+	    by_player: "",
+	    by_move: "",
+	};	
+
+  	$scope.listCanSwipe = true;
+ 	$scope.playingClipIndex = "";
+  
+  	$scope.openPopover = function($event) {
+	  	$scope.search.by_player = $scope.search.selected_player;
+	  	$scope.search.by_move = $scope.search.selected_move;
+	    $scope.popover.show($event);
+  	};
+
+  	$scope.filter = function() {
+
+	  	ErrorService.showLoader();
+
+	  	$ionicScrollDelegate.scrollTop();
+
+	  	var search = {
+	  		player: $scope.search.by_player,
+	  		move: $scope.search.by_move
+	  	};
+
+	  	$scope.search.selected_player = $scope.search.by_player;
+	  	$scope.search.selected_move = $scope.search.by_move;
+
+  		DBService.pagination().favorite().search(search, function() {		
 			ErrorService.hideLoader();
 		});
 
-    $scope.popover.hide();
-  };
+    	$scope.popover.hide();
+  	};
 
 	$scope.loadMore = function() { 
 		DBService.pagination().favorite().more(function() {
 			$scope.$broadcast('scroll.infiniteScrollComplete');
 		});
-  };
+  	};
 	
 	$scope.play = function(index) {		
 		$scope.playingClipIndex = index;
@@ -1833,13 +1452,32 @@ angular.module('app.controllers', [])
 	function setFavorite(index) {
 		DBService.updateFavorite($scope.clips[index]._id, $scope.clips[index].local, false);		
 	}
+
+	var clipLength = DBService.list().getFavoriteList().length;
+
+	if(clipLength) {
+		ErrorService.showLoader();
+	}
+
+	$timeout(function(){
+		$scope.noMoreItemsAvailable = DBService.pagination().favorite().hasNoMore();
+ 		$scope.clips = DBService.list().getFavoriteList();		
+ 		if(clipLength) ErrorService.hideLoader();	
+ 	}, 300);
 }])
 
-.controller('PlayersCtrl', ['$scope', '$state', 'DBService', function($scope, $state, DBService) {
-	
-	$scope.players = DBService.list().getPlayerList();
+.controller('PlayersCtrl', ['$scope', '$state', 'DBService', 'ErrorService', '$timeout', function($scope, $state, DBService, ErrorService, $timeout) {
 
-	$scope.doRefresh = function() {		
+	$scope.$on("$ionicView.loaded", function() {
+    	$timeout(function() {
+    		$scope.$broadcast('scroll.refreshStart');
+    	}, 300);    
+  	});
+
+	$scope.players = DBService.list().getPlayerList();
+	ErrorService.hideSplashScreen();
+
+	$scope.doRefresh = function() {
 		DBService.remoteDB().syncRemote(function() {
 			$scope.$broadcast('scroll.refreshComplete');
 		});
@@ -1847,6 +1485,10 @@ angular.module('app.controllers', [])
 		
 	$scope.showMoves = function(playerID, playerName) {
 		$state.go("tabsController.tab2Moves", {playerID: playerID, playerName: playerName});
+	};
+
+	$scope.myFilter = function (item) { 
+	    return item.clip_total > 0; 
 	};
 }])
 
@@ -1862,7 +1504,6 @@ angular.module('app.controllers', [])
 }])
 
 .controller('Tab2MovesCtrl', ['$scope', '$state', '$stateParams', 'moves', function($scope, $state, $stateParams, moves) {
-	
 	$scope.moves = moves;
 	$scope.playerName = $stateParams.playerName;
 
@@ -1893,14 +1534,15 @@ angular.module('app.directives', [])
         link: function(scope, element, attributes) {
 
             scope.$on('$ionicView.beforeEnter', function() {
-                scope.$watch(attributes.hideTabs, function(value){
+                scope.$watch(attributes.hideTabs, function(value){                    
                     $rootScope.hideTabs = value;
                 });
             });
 
-            scope.$on('$ionicView.beforeLeave', function() {
-                $rootScope.hideTabs = false;
-            });
+            // scope.$on('$ionicView.beforeLeave', function() {
+            //     console.log("$rootScope.hideTabs = false");
+            //     $rootScope.hideTabs = false;
+            // });
         }
     };
 }]);

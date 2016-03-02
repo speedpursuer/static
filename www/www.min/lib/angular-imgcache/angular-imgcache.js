@@ -42,25 +42,20 @@ angular.module('ImgCache', [])
         restrict: 'A',
         scope: {
             icBg: '@',
-            /*icSrc: '@'*/
         },
         link: function(scope, el, attrs) {
 
             var setImg = function(type, el, src) {
 
                 ImgCache.getCachedFileURL(src, function(src, dest) {
-                    if(type === 'bg') {
-                        el.css({'background-image': 'url(' + dest + ')' });
-                        $(el).removeClass('boxLoading');
-                    } else {
-                        el.attr('src', dest);
-                    }
+                    $(el).hide();
+                    el.css({'background-image': 'url(' + dest + ')' });
+                    $(el).removeClass('boxLoading');
+                    $(el).fadeIn(800);
                 });
             }
 
-            var loadImg = function(type, el, src) {
-
-            	//el.css({'background-image': 'url(images/oval.svg)' });
+            var loadImg = function(type, el, src) {            	
             	
             	$(el).addClass('boxLoading');
             	            	            	
@@ -73,8 +68,7 @@ angular.module('ImgCache', [])
                         } else {
                             ImgCache.cacheFile(src, function() {
                                 setImg(type, el, src);
-                            }, function() {
-                                //el.css({'background-image': 'url(images/back.jpg)' });
+                            }, function() {                                
                                 $(el).addClass('default');
                                 $(el).removeClass('boxLoading');                                
                             });
@@ -83,19 +77,12 @@ angular.module('ImgCache', [])
                     });
                 });
             }
-            /*
-            attrs.$observe('icSrc', function(src) {
-
-                loadImg('src', el, src);
-
-            });
-            */
+        
             attrs.$observe('icBg', function(src) {
 
                 loadImg('bg', el, src);
 
             });
-
         }
     };
 }])
@@ -105,31 +92,24 @@ angular.module('ImgCache', [])
     return {
         restrict: 'A',
         scope: {
-            //icBg: '@',
             icSrc: '@'
         },
         link: function(scope, el, attrs) {
 
-            var setImg = function(type, el, src) {
-                
-                /*
-                ImgCache.getCachedFileURL(src, function(src, dest) {
+            var setImg = function(type, el, src) {                
 
-                    if(type === 'bg') {
-                        el.css({'background-image': 'url(' + dest + ')' });
-                    } else {
-                        el.attr('src', dest);
-                    }
-                });*/
-                //$(el).fadeIn();
-                ImgCache.useCachedFileWithSource(el, src);              
+                $(el).hide();
+
+                ImgCache.useCachedFileWithSource(el, src, function(){
+                    $(el).fadeIn(1000);
+                }, function(){
+                    $(el).fadeIn(1000);
+                });        
             }
 
-            var loadImg = function(type, el, src) {
-
-                $(el).fadeIn();
-                
-                el.attr('src', "images/bg.jpg");
+            var loadImg = function(type, el, src) {                
+                             
+                el.attr('src', "images/bg.jpg");                
 
                 ImgCache.$promise.then(function() {
 
@@ -154,13 +134,6 @@ angular.module('ImgCache', [])
                 loadImg('src', el, src);
 
             });            
-            /*
-            attrs.$observe('icBg', function(src) {
-
-                loadImg('bg', el, src);
-
-            });
-            */
         }
     };
 }])
@@ -170,29 +143,16 @@ angular.module('ImgCache', [])
     return {
         restrict: 'A',
         scope: {
-            //icBg: '@',
             icSrc: '@'
         },
         link: function(scope, el, attrs) {
 
-            var setImg = function(type, el, src) {
-                
-                /*
-                ImgCache.getCachedFileURL(src, function(src, dest) {
+            var setImg = function(type, el, src) {               
 
-                    if(type === 'bg') {
-                        el.css({'background-image': 'url(' + dest + ')' });
-                    } else {
-                        el.attr('src', dest);
-                    }
-                });*/
-                //$(el).fadeIn();
                 ImgCache.useCachedFileWithSource(el, src);              
             }
 
-            var loadImg = function(type, el, src) {
-
-                $(el).fadeIn();
+            var loadImg = function(type, el, src) {        
                 
                 el.attr('src', "images/bg.jpg");
 
@@ -200,10 +160,10 @@ angular.module('ImgCache', [])
 
                     ImgCache.isCached(src, function(path, success) {
 
-                        if (success) {
+                        if (success) {                            
                             setImg(type, el, src);
                         } else {
-                            ImgCache.cacheFile(src, function() {
+                            ImgCache.cacheFile(src, function() {                                
                                 setImg(type, el, src);
                             }, function() {
                                 el.attr('src', "images/cloud.png");
@@ -215,17 +175,8 @@ angular.module('ImgCache', [])
             }
             
             attrs.$observe('icSrc', function(src) {
-
                 loadImg('src', el, src);
-
-            });            
-            /*
-            attrs.$observe('icBg', function(src) {
-
-                loadImg('bg', el, src);
-
-            });
-            */
+            });                   
         }
     };
 }])
@@ -236,29 +187,20 @@ angular.module('ImgCache', [])
     return {
         restrict: 'A',
         scope: {
-            //icBg: '@',
             icSrc: '@'
         },
         link: function(scope, el, attrs) {
 
-            var setImg = function(type, el, src) {
-                
-                /*
-                ImgCache.getCachedFileURL(src, function(src, dest) {
+            var setImg = function(type, el, src, callback) {                
 
-                    if(type === 'bg') {
-                        el.css({'background-image': 'url(' + dest + ')' });
-                    } else {
-                        el.attr('src', dest);
-                    }
-                });*/
-                //$(el).fadeIn();
-                ImgCache.useCachedFileWithSource(el, src);              
+                ImgCache.useCachedFileWithSource(el, src, function(){
+                    if(callback) callback();
+                }, function(){
+                    if(callback) callback();
+                });             
             }
 
-            var loadImg = function(type, el, src) {
-
-                $(el).fadeIn();
+            var loadImg = function(type, el, src) {        
                 
                 el.attr('src', "images/bg.jpg");
 
@@ -269,8 +211,11 @@ angular.module('ImgCache', [])
                         if (success) {
                             setImg(type, el, src);
                         } else {
-                            ImgCache.cacheFile(src, function() {
-                                setImg(type, el, src);
+                            ImgCache.cacheFile(src, function() {   
+                                $(el).hide();
+                                setImg(type, el, src, function(){
+                                    $(el).fadeIn(500);
+                                });
                             }, function() {
                                 el.attr('src', "images/default.png");
                             });
@@ -281,17 +226,8 @@ angular.module('ImgCache', [])
             }
             
             attrs.$observe('icSrc', function(src) {
-
                 loadImg('src', el, src);
-
-            });            
-            /*
-            attrs.$observe('icBg', function(src) {
-
-                loadImg('bg', el, src);
-
             });
-            */
         }
     };
 }])

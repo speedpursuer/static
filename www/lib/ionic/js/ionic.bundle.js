@@ -57329,7 +57329,7 @@ IonicModule
         });
       }
     }
-
+	// Lee Xing
     $scope.$on('scroll.refreshStart', function() {      
       ionic.requestAnimationFrame(show);
       ionic.requestAnimationFrame(activate);

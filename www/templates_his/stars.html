@@ -1,0 +1,31 @@
+<ion-view title="超级巨星" hide-nav-bar="false" hide-tabs="false">    
+    <!--
+    <ion-nav-buttons side="right">
+        <button class="button" ng-click="doRefresh()">
+          <i class="ion-information-circled assertive"></i>
+        </button>
+    </ion-nav-buttons>
+    -->
+    <ion-content overflow-scroll="true" padding="false" has-header="true">
+         <!--
+         <ion-refresher
+            pulling-text="Pull to refresh..."
+            on-refresh="doRefresh()">
+         </ion-refresher>
+         -->
+         <ion-slide-box>
+          <ion-slide ng-repeat="item in stars | orderBy: 'star'" ng-click='showMoves(item._id, item.name)'>          
+            <!---
+            <ion-slide ng-repeat="item in players" ui-sref='tabsController.clips({playerID: item._id, playerName: item.name})'>
+            <ion-slide ng-repeat="item in players" ng-click="select(item.doc._id)" ui-sref='clips({playerID: item.doc._id})'>
+            <img ng-src="{{item.doc.image}}">
+            <div class="slide-label">{{item.doc.name}}</div>
+            <div class="box blue" back-img="{{item.doc.image}}"><h1>{{item.doc.name}}</h1></div>            
+            <div class="box blue" img-cache ic-bg="{{item.doc.image}}"><h1>{{item.doc.name}}</h1></div>
+             <div class="box blue" img-cache-bg ic-bg="{{item.image}}"><h1>{{item.name_en}}</h1></div>
+            -->
+            <div class="box blue" img-cache-bg ic-bg="{{item.image}}"><h1>{{item.name_en}}</h1></div>
+          </ion-slide>          
+        </ion-slide-box>       
+    </ion-content>
+</ion-view>

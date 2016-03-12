@@ -6,8 +6,11 @@ angular.module('app.services', [])
     var service = {};    
 
     var string = {
-        dbName: dbString? "cliplay_prod": "cliplay_dev",  
-        remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",
+        dbName: "cliplay_uat",
+        remoteURL: "http://121.40.197.226:4984/",
+        // remoteURL: "http://app_viewer:Cliplay1234@121.40.197.226:4984/",
+        // dbName: dbString? "cliplay_uat": "cliplay_dev",
+        // remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",
         file: dbString? dbString.split(",")[1]: "db.txt",
         dbAdapter: "websql",
         installFail: false
@@ -16,276 +19,6 @@ angular.module('app.services', [])
     var db = null;
 
     var isPad = (typeof device !== 'undefined' && device.model.indexOf("iPad") !== -1)? true: false;
-
-    var dataTransfer = {
-
-        players: [],
-        moves: [],
-        clips: [],
-        db_new: {},  
-
-        getDateID: function() {
-            var currentdate = new Date();
-            var datetime = "" + 
-                           currentdate.getFullYear() + 
-                           (currentdate.getMonth() + 1) + 
-                           currentdate.getDate() + 
-                           currentdate.getHours() +
-                           currentdate.getMinutes() + 
-                           currentdate.getSeconds();
-            return datetime;
-        },    
-
-        countByPlayer: function(playerID, pList) {            
-            var that = this;
-
-            return $q(function(resolve, reject) {
-                that.db_new.allDocs({startkey: "clip_" + playerID, endkey: "clip_" + playerID + "\uffff"})
-                .then(function(result) {                 
-                    pList[playerID] = {total: result.rows.length};
-                    resolve("ok");
-                });
-            });                
-        },
-
-        countByPlayerMove: function(playerID, moveID, pList) {        
-
-            var that = this;
-
-            return $q(function(resolve, reject) {
-                that.db_new.allDocs({startkey: "clip_" + playerID + "_" + moveID, endkey: "clip_" + playerID + "_" + moveID + "\uffff"})
-                .then(function(result) {                   
-                    pList[playerID][moveID] = result.rows.length;                        
-                    resolve("ok");
-                });
-            });                
-        },
-
-        cleanDB: function(_db, dbName) {      
-            var deferred = $q.defer();
-            _db.destroy().then(function() {
-                _db = pouchdb.create(dbName, {adapter: string.dbAdapter, auto_compaction: false});                
-                deferred.resolve("DB recreated");                     
-            }).catch(function() {
-                deferred.reject("DB destroy err");
-            });
-            return deferred.promise;
-        },
-
-        setUpIndex: function() {          
-            return db.createIndex({
-                index: {
-                    fields: ['type']
-                }
-            });
-        },
-
-        generateDump: function(_db, dumpName) {
-            setupView(_db).then(function(){            
-                _db.replicate.to("http://admin:12341234@localhost:5984/" + dumpName).then(function(){
-                    console.log("dump success");
-                });
-            });        
-        },
-
-        transfer: function() {
-            db = pouchdb.create("cliplay", {adapter: string.dbAdapter, auto_compaction: false});                
-            this.db_new = pouchdb.create("cliplay_new", {adapter: string.dbAdapter, auto_compaction: false});
-
-            var that = this;
-
-            that.cleanDB(db, "cliplay")
-            .then(function() {
-                that.cleanDB(that.db_new, "cliplay_new").then(function(){
-                    string.remoteURL = "http://121.40.197.226:4984/";
-                    string.dbName = "cliplay"
-                    syncFromRemote().then(function() {
-                        that.setUpIndex().then(function(){                
-                            
-                            var list = [];                            
-
-                            list.push(that.getList("player", dataTransfer.players));
-
-                            list.push(that.getList("move", dataTransfer.moves));
-
-                            list.push(that.getList("clip", dataTransfer.clips));
-
-                            executePromises(list).then(function() {
-                                
-                                var moves = dataTransfer.moves;
-                                var players = dataTransfer.players;
-                                var clips = dataTransfer.clips;
-                                
-
-                                var moveList = [], playerList = [], clipList = [], pList = {};
-
-                                for(i in moves) {
-                                    var el = moves[i];
-
-                                    var item = {
-                                        _id: "move_" + el._id.toLowerCase(),
-                                        desc: el.desc,
-                                        image: el.image,
-                                        move_name: el.move_name
-                                    };
-
-                                    moveList.push(item);
-                                }
-
-                                var id = parseInt(that.getDateID());
-
-                                for(i in clips) {                                
-                                                                    
-                                    var el = clips[i];
-
-                                    var playerName = "";
-                                    var moveName = "";
-
-                                    try{
-                                        playerName = players[el.player].name_en.replace(/ /g,"_");
-                                        moveName = moves[el.move]._id;                                  
-                                    }
-                                    catch(err){
-                                        console.log(err + " happens in: " + el._id);
-                                    }
-                                
-                                    var prefix = "player_" + playerName.toLowerCase() + "_move_" + moveName.toLowerCase() + "_" + id;
-
-                                    var item = {
-                                        _id: "clip_" + prefix,
-                                        desc: el.desc,
-                                        image: el.image,
-                                        name: el.name,
-                                        local: "local_" + prefix,
-                                        move: "move_" + moveName.toLowerCase(),
-                                        player: "player_" + playerName.toLowerCase()
-                                    };
-
-                                    clipList.push(item);
-
-                                    id++;
-                                }
-
-                                that.db_new.bulkDocs(moveList.concat(clipList)).then(function (result) {
-
-                                    var list = [];                       
-                                    
-                                    for(i in players) {
-                                    
-                                        var el = players[i];
-
-                                        var id = "player_" + el.name_en.replace(/ /g,"_").toLowerCase();                                       
-
-                                        console.log(id);                                   
-
-                                        list.push(that.countByPlayer(id, pList));                                        
-
-                                        for(i in moves) {
-                                            var id_move = "move_" + moves[i]._id.toLowerCase();
-
-                                            list.push(that.countByPlayerMove(id, id_move, pList));                                                    
-                                        }                                                                                
-                                    }
-
-                                    executePromises(list).then(function(){                                 
-
-                                        for(i in players) {
-
-                                            var el = players[i];
-
-                                            var id = "player_" + el.name_en.replace(/ /g,"_").toLowerCase();  
-
-                                            var playerCount = pList[id];
-
-                                            var moveList = {};
-
-                                            var total = 0;
-
-                                            for(b in playerCount) {
-                                                if(b == "total") {
-                                                    total = playerCount[b];
-                                                }else{
-                                                    moveList[b] = playerCount[b];
-                                                }
-                                            }
-
-                                            var item = {
-                                                _id: id,
-                                                desc: el.desc,
-                                                image: el.image,
-                                                name: el.name,
-                                                name_en: el.name_en,
-                                                star: el.star,
-                                                avatar: el.avatar,
-                                                clip_total: total,
-                                                clip_moves: moveList
-                                            };
-
-                                            playerList.push(item);
-                                        }
-                                        
-                                        that.db_new.bulkDocs(playerList).then(function (result) {
-                                            that.generateDump(that.db_new, "cliplay_dump_3_2");
-                                        }).catch(function (err) {
-                                            console.log(err);
-                                        });                                      
-
-                                    }).catch(function(e){
-                                        console.log(e);
-                                    });
-
-                                }).catch(function (err) {
-                                    console.log(err);
-                                });                                                        
-                            });
-                        }).catch(function(e) {
-                            console.log(e);
-                        });             
-                    });
-                });
-            })
-        },
-
-        getList: function(type, list) {
-            return $q(function(resolve, reject) {
-                db.find({
-                    selector: {type: type}
-                }).then(function(result) {
-                    if(type=="player") {
-                        
-                        var list = result.docs;
-
-                        var returnList = [];
-
-                        for(i in list) {
-                            var id = list[i]._id;
-                            returnList[id] = list[i];
-                        }
-
-                        dataTransfer.players = returnList;
-
-                    }else if(type=="move"){
-
-                        var list = result.docs;
-
-                        var returnList = [];
-
-                        for(i in list) {
-                            var id = list[i]._id;
-                            returnList[id] = list[i];
-                        }
-
-                        dataTransfer.moves = returnList;
-                    }else {
-                        dataTransfer.clips = result.docs;
-                    }                    
-                    resolve("");
-                }).catch(function() {
-                    reject("");
-                })
-            });
-        }        
-    };
 
     service.list = function() {
         return list;
@@ -390,6 +123,8 @@ angular.module('app.services', [])
 
         getMoves: function() {
 
+            // console.log("ready retrieveAllMoves");
+
             var deferred = $q.defer();
 
             db.allDocs({
@@ -403,6 +138,8 @@ angular.module('app.services', [])
                 });
 
                 list.setMoveList(result);
+
+                // console.log("finished retrieveAllMoves");
 
                 deferred.resolve("All moves retrieved");
 
@@ -839,7 +576,7 @@ angular.module('app.services', [])
         //console.log("start to init");
         var deferred = $q.defer();
 
-        dataTransfer.transfer(); return;
+        //dataTransfer.transfer(); return;
         createDB();
         //generateDump(); return;
         
@@ -852,7 +589,7 @@ angular.module('app.services', [])
             .then(loadDBDump)
             .then(markInstalled)
             .then(function() {
-                //console.log("DB installed");                
+                // console.log("DB installed");                
                 syncData(deferred, true);
             }).catch(function (err){                
                 console.log("install err, details = " + err);                
@@ -989,7 +726,7 @@ angular.module('app.services', [])
     }
 
     function retrieveAllPlayers() {
-        //console.log("ready for retrieveAllPlayers");
+        // console.log("ready for retrieveAllPlayers");
         var deferred = $q.defer();
 
         db.allDocs({
@@ -1009,6 +746,8 @@ angular.module('app.services', [])
             }
 
             list.setPlayerList(result);
+
+            // console.log("finished retrieveAllPlayers");
 
             deferred.resolve("All players retrieved");
 
@@ -1093,7 +832,7 @@ angular.module('app.services', [])
     }    
 
     function loadDBDump() {
-        //console.log("Start to loadDBDump");
+        // console.log("Start to loadDBDump");
         
         var deferred = $q.defer();      
 
@@ -1106,8 +845,9 @@ angular.module('app.services', [])
                         var reader = new FileReader();
 
                         reader.onloadend = function(e) {
-                            var option = (!string.installFail && hasNetwork()) ? {proxy: string.remoteURL + string.dbName}: {};                          
-                            deferred.resolve(db.load(this.result, option));                       
+                            // var option = (!string.installFail && hasNetwork()) ? {proxy: string.remoteURL + string.dbName}: {};                          
+                            // deferred.resolve(db.load(this.result, option));                       
+                            deferred.resolve(db.load(this.result));                    
                         }
 
                         reader.readAsText(file);
@@ -1180,7 +920,7 @@ angular.module('app.services', [])
     }
     
     function markInstalled() {
-        //console.log("Install finished");
+        // console.log("Install finished");
         return db.put({
             _id: '_local/DBInstalled',
             status: 'completed'

@@ -78,6 +78,17 @@ angular.module('app.controllers', [])
 
 .controller('FavorateCtrl', ['$scope', '$state', '$ionicScrollDelegate', '$ionicListDelegate', '$ionicPopover', 'ErrorService', 'DBService', 'NativeService', '$timeout', function($scope, $state, $ionicScrollDelegate, $ionicListDelegate, $ionicPopover, ErrorService, DBService, NativeService, $timeout) {
 	
+	$scope.listCanSwipe = true;
+ 	$scope.playingClipIndex = "";
+ 	$scope.clips = [];
+
+ 	$scope.search = {
+	 	selected_player: "",
+	  	selected_move: "",    
+	    by_player: "",
+	    by_move: "",
+	};
+
 	$scope.data = {  	
     	players: DBService.list().getPlayerList(),
     	moves: DBService.list().getMoveList()
@@ -88,16 +99,6 @@ angular.module('app.controllers', [])
 	}).then(function(popover) {
 	    $scope.popover = popover;
 	});
-
-	$scope.search = {
-	 	selected_player: "",
-	  	selected_move: "",    
-	    by_player: "",
-	    by_move: "",
-	};	
-
-  	$scope.listCanSwipe = true;
- 	$scope.playingClipIndex = "";
   
   	$scope.openPopover = function($event) {
 	  	$scope.search.by_player = $scope.search.selected_player;

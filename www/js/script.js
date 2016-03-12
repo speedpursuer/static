@@ -174,7 +174,7 @@ angular.module('app.services', [])
     var service = {};    
 
     var string = {
-        dbName: dbString? "cliplay_prod": "cliplay_dev",  
+        dbName: dbString? "cliplay_uat": "cliplay_dev",
         remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",
         file: dbString? dbString.split(",")[1]: "db.txt",
         dbAdapter: "websql",
@@ -288,6 +288,8 @@ angular.module('app.services', [])
 
         getMoves: function() {
 
+            // console.log("ready retrieveAllMoves");
+
             var deferred = $q.defer();
 
             db.allDocs({
@@ -301,6 +303,8 @@ angular.module('app.services', [])
                 });
 
                 list.setMoveList(result);
+
+                // console.log("finished retrieveAllMoves");
 
                 deferred.resolve("All moves retrieved");
 
@@ -738,7 +742,8 @@ angular.module('app.services', [])
         var deferred = $q.defer();
 
         //dataTransfer.transfer(); return;
-        createDB();        
+        createDB();
+        //generateDump(); return;
         
         isDBInstalled()
         .then(function() {        
@@ -749,7 +754,7 @@ angular.module('app.services', [])
             .then(loadDBDump)
             .then(markInstalled)
             .then(function() {
-                //console.log("DB installed");                
+                // console.log("DB installed");                
                 syncData(deferred, true);
             }).catch(function (err){                
                 console.log("install err, details = " + err);                
@@ -886,7 +891,7 @@ angular.module('app.services', [])
     }
 
     function retrieveAllPlayers() {
-        //console.log("ready for retrieveAllPlayers");
+        // console.log("ready for retrieveAllPlayers");
         var deferred = $q.defer();
 
         db.allDocs({
@@ -906,6 +911,8 @@ angular.module('app.services', [])
             }
 
             list.setPlayerList(result);
+
+            // console.log("finished retrieveAllPlayers");
 
             deferred.resolve("All players retrieved");
 
@@ -990,7 +997,7 @@ angular.module('app.services', [])
     }    
 
     function loadDBDump() {
-        //console.log("Start to loadDBDump");
+        // console.log("Start to loadDBDump");
         
         var deferred = $q.defer();      
 
@@ -1003,8 +1010,9 @@ angular.module('app.services', [])
                         var reader = new FileReader();
 
                         reader.onloadend = function(e) {
-                            var option = (!string.installFail && hasNetwork()) ? {proxy: string.remoteURL + string.dbName}: {};                          
-                            deferred.resolve(db.load(this.result, option));                       
+                            // var option = (!string.installFail && hasNetwork()) ? {proxy: string.remoteURL + string.dbName}: {};                          
+                            // deferred.resolve(db.load(this.result, option));                       
+                            deferred.resolve(db.load(this.result));                    
                         }
 
                         reader.readAsText(file);
@@ -1077,7 +1085,7 @@ angular.module('app.services', [])
     }
     
     function markInstalled() {
-        //console.log("Install finished");
+        // console.log("Install finished");
         return db.put({
             _id: '_local/DBInstalled',
             status: 'completed'
@@ -1376,6 +1384,17 @@ angular.module('app.controllers', [])
 
 .controller('FavorateCtrl', ['$scope', '$state', '$ionicScrollDelegate', '$ionicListDelegate', '$ionicPopover', 'ErrorService', 'DBService', 'NativeService', '$timeout', function($scope, $state, $ionicScrollDelegate, $ionicListDelegate, $ionicPopover, ErrorService, DBService, NativeService, $timeout) {
 	
+	$scope.listCanSwipe = true;
+ 	$scope.playingClipIndex = "";
+ 	$scope.clips = [];
+
+ 	$scope.search = {
+	 	selected_player: "",
+	  	selected_move: "",    
+	    by_player: "",
+	    by_move: "",
+	};
+
 	$scope.data = {  	
     	players: DBService.list().getPlayerList(),
     	moves: DBService.list().getMoveList()
@@ -1386,16 +1405,6 @@ angular.module('app.controllers', [])
 	}).then(function(popover) {
 	    $scope.popover = popover;
 	});
-
-	$scope.search = {
-	 	selected_player: "",
-	  	selected_move: "",    
-	    by_player: "",
-	    by_move: "",
-	};	
-
-  	$scope.listCanSwipe = true;
- 	$scope.playingClipIndex = "";
   
   	$scope.openPopover = function($event) {
 	  	$scope.search.by_player = $scope.search.selected_player;

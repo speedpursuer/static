@@ -195,23 +195,48 @@ angular.module('app.controllers', [])
 	};
 }])
 
-.controller('MovesCtrl', ['$scope', '$state', '$stateParams', 'moves', function($scope, $state, $stateParams, moves) {
+.controller('MovesCtrl', ['$scope', '$state', '$stateParams', 'moves', 'DBService', function($scope, $state, $stateParams, moves, DBService) {
 
 	$scope.moves = moves;
 	$scope.playerName = $stateParams.playerName;
 
 	$scope.showClips = function(moveName, moveID) {
-		$state.go("tabsController.clips", {playerID: $stateParams.playerID, moveName: moveName, moveID: moveID});
+		//$state.go("tabsController.clips", {playerID: $stateParams.playerID, moveName: moveName, moveID: moveID});
+		DBService.playClipsByMove($stateParams.playerID, moveID);
 	};
 
 }])
 
-.controller('Tab2MovesCtrl', ['$scope', '$state', '$stateParams', 'moves', function($scope, $state, $stateParams, moves) {
+.controller('Tab2MovesCtrl', ['$scope', '$state', '$stateParams', 'moves', 'DBService', function($scope, $state, $stateParams, moves, DBService) {
 	$scope.moves = moves;
 	$scope.playerName = $stateParams.playerName;
 
 	$scope.showClips = function(moveName, moveID) {
-		$state.go("tabsController.tab2Clips", {playerID: $stateParams.playerID, moveName: moveName, moveID: moveID});
+		//$state.go("tabsController.tab2Clips", {playerID: $stateParams.playerID, moveName: moveName, moveID: moveID});
+		DBService.playClipsByMove($stateParams.playerID, moveID);
 	};
 
+	// $scope.showClips = function(moveName, moveID) {
+	// 	$state.go("tabsController.tab2Clips", {playerID: $stateParams.playerID, moveName: moveName, moveID: moveID});
+	// };
+
+}])
+
+.controller('NewsCtrl', ['$scope', '$state', '$stateParams', 'DBService', 'NativeService', function($scope, $state, $stateParams, DBService, NativeService) {
+	$scope.noMoreItemsAvailable = DBService.pagination().news().hasNoMore();
+ 	$scope.news = DBService.list().getNewsList();
+
+ 	$scope.loadMore = function() { 
+		DBService.pagination().news().more(function() {
+			$scope.$broadcast('scroll.infiniteScrollComplete');
+		});
+  	};	
+
+	$scope.showClips = function(index) {
+		DBService.readNews($scope.news[index])
+		.finally(function(){
+			console.log("playAnimation");
+			NativeService.playAnimation($scope.news[index].image);
+		});		
+	};
 }])

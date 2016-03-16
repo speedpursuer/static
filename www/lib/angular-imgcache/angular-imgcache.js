@@ -149,7 +149,14 @@ angular.module('ImgCache', [])
 
             var setImg = function(type, el, src) {               
 
-                ImgCache.useCachedFileWithSource(el, src);              
+                // ImgCache.useCachedFileWithSource(el, src);              
+                $(el).hide();
+
+                ImgCache.useCachedFileWithSource(el, src, function(){
+                    $(el).fadeIn(500);
+                }, function(){
+                    $(el).fadeIn(500);
+                });
             }
 
             var loadImg = function(type, el, src) {        

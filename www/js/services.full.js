@@ -1,15 +1,16 @@
 angular.module('app.services', [])
 
 
-.factory('DBService', ['$q', '$timeout', 'pouchdb', 'ErrorService', 'FileCacheService', function($q, $timeout, pouchdb, ErrorService, FileCacheService) {
+.factory('DBService', ['$q', '$timeout', 'pouchdb', 'ErrorService', 'FileCacheService', 'NativeService', function($q, $timeout, pouchdb, ErrorService, FileCacheService, NativeService) {
 
     var service = {};    
 
     var string = {
-        dbName: "cliplay_uat",  
-        //dbName: dbString? "cliplay_prod": "cliplay_dev",  
-        remoteURL: "http://121.40.197.226:4984/",
-        //remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",
+        // dbName: "cliplay",
+        // remoteURL: "http://admin:12341234@localhost:5984/",
+        // remoteURL: "http://app_viewer:Cliplay1234@121.40.197.226:4984/",
+        dbName: dbString? "cliplay": "cliplay_dev",
+        remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",
         file: dbString? dbString.split(",")[1]: "db.txt",
         dbAdapter: "websql",
         installFail: false
@@ -18,7 +19,7 @@ angular.module('app.services', [])
     var db = null;
 
     var isPad = (typeof device !== 'undefined' && device.model.indexOf("iPad") !== -1)? true: false;
-
+    
     var dataTransfer = {
 
         players: [],
@@ -289,6 +290,121 @@ angular.module('app.services', [])
         }        
     };
 
+
+    var dataProcess = {
+
+        init: function() {
+
+            var newDB = "cliplay_dev_3_14"
+
+            var dbName = "cliplay";
+
+            var remoteURL = "http://app_viewer:Cliplay1234@121.40.197.226:4984/cliplay_uat";
+
+            var that = this;
+
+            db = pouchdb.create(dbName);                
+
+            db.destroy().then(function(){
+                db = pouchdb.create(dbName);       
+                return db;
+            }).then(function(){
+                return db.replicate.from(remoteURL);
+            }).then(function(){                
+                return db.allDocs({
+                    include_docs: true,
+                    startkey: "player",
+                    endkey: "player\uffff"            
+                });
+            }).then(function (result) {              
+
+                var promises = [];                  
+
+                for(i in result.rows) {
+                    var doc = result.rows[i].doc;
+                    if( doc.clip_total > 0 ){
+                        var moves = doc.clip_moves;
+                        for(move in moves) {
+                            if(moves[move] > 0) {
+                                promises.push(that.getClips(doc._id, move));    
+                            }                         
+                        }
+                    }
+                }
+
+                return executePromises(promises);
+
+            }).then(function() {
+                return db.replicate.to("http://admin:12341234@localhost:5984/" + newDB, {
+                    filter: function (doc) {
+                        // return doc._id === 'marsupial';
+                        return doc._id.indexOf('clip_') != 0;
+                    }
+                });                   
+            }).then(function() {
+                console.log("dataProcess success");
+            }).catch(function (err) {
+                console.log("dataProcess failed = " + err);
+            });          
+        },
+
+        getClips: function(playerID, moveID) {
+
+            var deferred = $q.defer();
+
+            var that = this;
+
+            var _options = {descending: true, include_docs: true, endkey: "clip_" + playerID + "_" + moveID + "_", startkey: "clip_" + playerID + "_" + moveID + "_" + "\uffff"};
+            
+            db.allDocs(_options).then(function (result) {
+
+                if (result && result.rows.length > 0) {                        
+
+                    var list = [];
+
+                    for(i in result.rows) {
+                        list.push(result.rows[i].doc.image);
+                    }                        
+
+                    var newDoc = {
+                        _id: "post_" + playerID + "_" + moveID,                            
+                        image: list
+                    }
+
+                    console.log("ready to put newDoc");
+                    console.log(newDoc);
+
+                    db.put(newDoc).then(function() {
+                        deferred.resolve("New doc saved");                    
+                    }).catch(function(err) {
+                        deferred.reject(err);
+                    });                        
+
+                }else{                        
+                    deferred.resolve("No more data");             
+                }                                                        
+
+            }).catch(function (err) {
+                deferred.reject(err);
+            });
+
+            return deferred.promise;
+        },
+    };
+
+    service.playClipsByMove = function(playerID, moveID) {
+        var id = "post_" + playerID + "_" + moveID;
+        db.get(id).then(function(result) {            
+            if(!result.image instanceof Array) {
+                console.log("Image list not retrieved");    
+                return;
+            }
+            NativeService.playAnimation(result.image);
+        }).catch(function(e){
+            console.log(e);
+        });      
+    };
+
     service.list = function() {
         return list;
     };      
@@ -312,6 +428,7 @@ angular.module('app.services', [])
         moveList: [],
         clipList: [],
         starList: [],
+        newsList: [],
 
         getStarList: function(){
             return this.starList;
@@ -323,10 +440,22 @@ angular.module('app.services', [])
 
         resetClipList: function() {     
             this.clipList.length = 0;                 
-        },
+        },        
 
         getClipList: function(){
             return this.clipList;
+        },
+
+        setNewsList: function(_list) {                 
+            copyList(this.newsList, _list);
+        },
+
+        resetNewsList: function() {     
+            this.newsList.length = 0;                 
+        },
+
+        getNewsList: function(){
+            return this.newsList;
         },
 
         setMoveList: function(_list) {                                                             
@@ -392,6 +521,8 @@ angular.module('app.services', [])
 
         getMoves: function() {
 
+            // console.log("ready retrieveAllMoves");
+
             var deferred = $q.defer();
 
             db.allDocs({
@@ -405,6 +536,8 @@ angular.module('app.services', [])
                 });
 
                 list.setMoveList(result);
+
+                // console.log("finished retrieveAllMoves");
 
                 deferred.resolve("All moves retrieved");
 
@@ -460,6 +593,80 @@ angular.module('app.services', [])
 
         favorite: function() {
             return this.favoritePg;
+        },
+
+        news: function() {
+            return this.newsPg;
+        },
+
+        newsPg: {
+            options: {},
+            end: {noMore: true},
+            limit: isPad? 12: 7,    
+            descending: true,           
+            init: function(playerID, moveID) {                
+                this.options = {descending : this.descending, include_docs: true, limit : this.limit, endkey: "news_", startkey: "news_" + "\uffff"};                                
+                list.resetNewsList();
+                this.end.noMore = true;
+                return this.getNews();
+            },
+            
+            more: function(callback) {            
+                this.getNews()
+                .catch(function(){
+                    ErrorService.showAlert('无法获取数据');
+                }).finally(function(){
+                    if(callback) callback();
+                });
+            },
+            
+            hasNoMore: function() {                
+                return this.end;
+            },
+           
+            getNews: function() {
+
+                var deferred = $q.defer();
+
+                var that = this;
+
+                var _options = that.options;
+                
+                db.allDocs(_options).then(function (result) {
+
+                    if (result && result.rows.length > 0) {
+
+                        _options.startkey = result.rows[result.rows.length - 1].key;                        
+
+                        result = result.rows.map(function(row) {                            
+                            return row.doc;
+                        });    
+
+                        if(result.length < that.limit) {
+                            that.end.noMore = true;
+                        }else{
+                            that.end.noMore = false;
+                        }
+
+                        if(result.length == that.limit) {
+                            result.splice(-1,1);
+                        }                            
+                        
+                        list.setNewsList(result);
+
+                        deferred.resolve("More data fetched");
+                                             
+                    }else{                       
+                        that.end.noMore = true;            
+                        deferred.resolve("No more data");             
+                    }                                                        
+
+                }).catch(function (err) {
+                    deferred.reject(err);
+                });
+
+                return deferred.promise;
+            },
         },
 
         clipsPg: {
@@ -675,15 +882,14 @@ angular.module('app.services', [])
         syncRemote: function(callback) {
             syncFromRemote().then(function(result) {
                 if(result.docs_written > 0) {                  
-                    refreshAllPlayers().finally(function(){
-                        if(callback) callback();        
-                    });                  
+                    return refreshAllPlayers().then(retrieveNews);                    
                 }else{                    
-                    if(callback) callback();
+                    return true;
                 }
-            }).catch(function(err) {
-                if(callback) callback();
+            }).catch(function(err) {                
                 syncFail();
+            }).finally(function(){
+                if(callback) callback();        
             });
         },    
 
@@ -701,6 +907,18 @@ angular.module('app.services', [])
 
     service.put = function(doc) {
         return db.put(doc);
+    };
+
+    service.readNews = function(news) {
+        if (!news.read) news.read = true;
+        return db.get(news._id).then(function(result) {
+            if(!result.read) {
+                result.read = true;
+                return db.put(result);
+            }else {
+                return true;
+            }
+        });
     };
 
     service.updateBoth = function(clipID, favorite, curClipList) {
@@ -841,10 +1059,10 @@ angular.module('app.services', [])
         //console.log("start to init");
         var deferred = $q.defer();
 
-        //dataTransfer.transfer(); return;
-        createDB();
-        //generateDump(); return;
-        
+        // dataTransfer.transfer(); return;        
+        // dataProcess.init(); return;
+        createDB();        
+                
         isDBInstalled()
         .then(function() {        
             syncData(deferred, false);
@@ -854,7 +1072,7 @@ angular.module('app.services', [])
             .then(loadDBDump)
             .then(markInstalled)
             .then(function() {
-                //console.log("DB installed");                
+                // console.log("DB installed");                
                 syncData(deferred, true);
             }).catch(function (err){                
                 console.log("install err, details = " + err);                
@@ -899,7 +1117,8 @@ angular.module('app.services', [])
         var list = [];
         list.push(retrieveAllPlayers());
         list.push(retrieveAllMoves());
-        if(!isInstall) list.push(retrieveFavorites());
+        //if(!isInstall) list.push(retrieveFavorites());
+        list.push(retrieveNews());
         return executePromises(list);
     }
 
@@ -985,13 +1204,17 @@ angular.module('app.services', [])
         return pagination.favorite().init();
     }
 
+    function retrieveNews() {
+        return pagination.news().init();
+    }
+
     function retrieveAllMoves() {
         //console.log("ready for retrieveAllMoves");
         return dataFetcher.getMoves();
     }
 
     function retrieveAllPlayers() {
-        //console.log("ready for retrieveAllPlayers");
+        // console.log("ready for retrieveAllPlayers");
         var deferred = $q.defer();
 
         db.allDocs({
@@ -1011,6 +1234,8 @@ angular.module('app.services', [])
             }
 
             list.setPlayerList(result);
+
+            // console.log("finished retrieveAllPlayers");
 
             deferred.resolve("All players retrieved");
 
@@ -1087,7 +1312,7 @@ angular.module('app.services', [])
             db = null;
         }
         db = pouchdb.create(string.dbName, {size: 40, adapter: string.dbAdapter, auto_compaction: false});
-        //deleteDB();        
+        // deleteDB();        
     }
 
     function syncFromRemote() {     
@@ -1095,7 +1320,7 @@ angular.module('app.services', [])
     }    
 
     function loadDBDump() {
-        //console.log("Start to loadDBDump");
+        // console.log("Start to loadDBDump");
         
         var deferred = $q.defer();      
 
@@ -1108,8 +1333,9 @@ angular.module('app.services', [])
                         var reader = new FileReader();
 
                         reader.onloadend = function(e) {
-                            var option = (!string.installFail && hasNetwork()) ? {proxy: string.remoteURL + string.dbName}: {};                          
-                            deferred.resolve(db.load(this.result, option));                       
+                            // var option = (!string.installFail && hasNetwork()) ? {proxy: string.remoteURL + string.dbName}: {};                          
+                            // deferred.resolve(db.load(this.result, option));                       
+                            deferred.resolve(db.load(this.result));                    
                         }
 
                         reader.readAsText(file);
@@ -1182,7 +1408,7 @@ angular.module('app.services', [])
     }
     
     function markInstalled() {
-        //console.log("Install finished");
+        // console.log("Install finished");
         return db.put({
             _id: '_local/DBInstalled',
             status: 'completed'
@@ -1333,11 +1559,15 @@ angular.module('app.services', [])
         console.log(e)
     };
     
-    service.playAnimation = function(clipURL, favorite, showFavBut) {
-        favorite = favorite? "true": "false";
-        showFavBut = showFavBut? "true": "false";
-        cordova.exec(win, fail, "MyHybridPlugin", "playClip", [clipURL, favorite, showFavBut]);
+    service.playAnimation = function(list) {        
+        cordova.exec(win, fail, "MyHybridPlugin", "playClip", list);
     };
+
+    // service.playAnimation = function(clipURL, favorite, showFavBut) {
+    //     favorite = favorite? "true": "false";
+    //     showFavBut = showFavBut? "true": "false";
+    //     cordova.exec(win, fail, "MyHybridPlugin", "playClip", [clipURL, favorite, showFavBut]);
+    // };
 
     service.showMessage = function(title, desc, retry) {        
         var _retry = "false";

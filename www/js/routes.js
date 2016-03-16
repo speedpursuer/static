@@ -103,13 +103,23 @@ angular.module('app.routes', [])
       }
     })  
 
-    .state('tabsController.favorite', {
-      url: '/favorite',      
+    .state('tabsController.news', {
+      url: '/news',      
       views: {
-        'tab4': {
-          controller: 'FavorateCtrl',
-          templateUrl: 'templates/favorite.html',
+        'tab3': {
+          controller: 'NewsCtrl',
+          templateUrl: 'templates/news.html',
         }
       }
     })
+
+    // .state('tabsController.favorite', {
+    //   url: '/favorite',      
+    //   views: {
+    //     'tab4': {
+    //       controller: 'FavorateCtrl',
+    //       templateUrl: 'templates/favorite.html',
+    //     }
+    //   }
+    // })
 }]);

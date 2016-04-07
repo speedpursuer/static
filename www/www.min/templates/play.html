@@ -1,31 +1,27 @@
-<ion-view title="" hide-tabs="'true'" hide-nav-bar="false">
-		<ion-nav-bar ng-hide="hideNavBar">
-		  <ion-nav-back-button class="button-icon icon ion-ios-arrow-back" ng-click="goBack()">
-		  	Back
-		  </ion-nav-back-button>		  
-		</ion-nav-bar>    
-        <div id="gameArea">
-            <canvas id="viewport" class="center" width="0" height="0" ng-click='fullScreen()'></canvas>
-            <nav id="toolbar" class="flex-container navbar navbar-default navbar-fixed-bottom">               
-                <div id="toolbar-controls" class="flex-container">                     
-                    <div class="button-container">
-                        <!--                            	
-                        <button type="button" data-command="toggle" class="btn btn-default">
-                            <i class="fa fa-play icon-play ion-play"></i>
-                            <i class="fa fa-pause icon-pause ion-pause"></i>
-                        </button>                   
-                        <span class="slider-value badge">0</span>    
-                        -->
-                        <a class="button button-icon icon" data-command="toggle"></a>
-                    </div>            
-                    <div class="slider-container range range-positive">
-                        <input type="range" min="0" max="0" class="range">
-                    </div>
-                    <div class="slider-value-container">
-                        
-                        <a class="button button-icon icon" ng-class="{'ion-ios-heart' : favorite, 'ion-ios-heart-outline' : !favorite}" ng-click="setFavorite()"></a>
-                    </div>
-                </div>  
-            </nav>
-        </div>    
+<ion-view title="{{catName}}" hide-tabs="true">
+    <ion-content>        
+        <ion-list>
+            <ion-item ng-repeat="item in plays" class="item-thumbnail-left level" ng-click='playPlay($index)'>
+                <img img-cache-src-common ic-src="{{item.thumb}}">
+                <div class="row">
+                    <div class="col col-top col-75"><h2>{{item.name}}</h2></div>
+                    <div class="col col-top col-star" ng-show="item.level==3">                    
+                        <i class="ion-ios-star basketball"></i>
+                        <i class="ion-ios-star basketball"></i>
+                        <i class="ion-ios-star basketball"></i>
+                    </div>      
+                    <div class="col col-top col-star" ng-show="item.level==2">                    
+                        <i class="ion-ios-star basketball"></i>
+                        <i class="ion-ios-star basketball"></i>                        
+                    </div>  
+                    <div class="col col-top col-star" ng-show="item.level==1">                    
+                        <i class="ion-ios-star basketball"></i>                        
+                    </div>                          
+                </div>
+                <div class="row">
+                    <div class="col col-top"><p>{{item.desc}}</p></div>
+                </div>                
+            </ion-item>
+        </ion-list>      
+    </ion-content>
 </ion-view>

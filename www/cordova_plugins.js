@@ -273,14 +273,14 @@ module.exports = [
 			"Connection"
 		]
 	},
-//    {
-//        "file": "plugins/com.phonegap.plugins.sqlite/www/SQLitePlugin.js",
-//        "id": "com.phonegap.plugins.sqlite.SQLitePlugin",
-//        "pluginId": "com.phonegap.plugins.sqlite",
-//        "clobbers": [
-//            "SQLitePlugin"
-//        ]
-//    }
+    {
+        "file": "plugins/com.phonegap.plugins.sqlite/www/SQLitePlugin.js",
+        "id": "com.phonegap.plugins.sqlite.SQLitePlugin",
+        "pluginId": "com.phonegap.plugins.sqlite",
+        "clobbers": [
+            "SQLitePlugin"
+        ]
+    }
 ];
 module.exports.metadata = 
 // TOP OF METADATA

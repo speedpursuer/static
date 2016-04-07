@@ -19,6 +19,7 @@ angular.module('app', ['ionic', 'app.controllers', 'app.routes', 'app.services',
 
     $ionicConfigProvider.views.swipeBackEnabled(false);
     $ionicConfigProvider.scrolling.jsScrolling(false);
+    // $ionicConfigProvider.views.maxCache(20);
 }])
 
 .run(['$ionicPlatform', '$cordovaStatusbar', '$rootScope', function($ionicPlatform, $cordovaStatusbar, $rootScope) {

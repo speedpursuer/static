@@ -45,13 +45,15 @@ angular.module('ImgCache', [])
         },
         link: function(scope, el, attrs) {
 
-            var setImg = function(type, el, src) {
+            var setImg = function(type, el, src, callback) {
 
                 ImgCache.getCachedFileURL(src, function(src, dest) {
-                    $(el).hide();
-                    el.css({'background-image': 'url(' + dest + ')' });
-                    $(el).removeClass('boxLoading');
-                    $(el).fadeIn(800);
+                    //$(el).hide();
+                    el.css({'background-image': 'url(' + dest + ')' });                   
+                    if(callback) callback();
+                    //$(el).fadeIn(800);
+                }, function(){
+                    if(callback) callback();
                 });
             }
 
@@ -62,18 +64,22 @@ angular.module('ImgCache', [])
                 ImgCache.$promise.then(function() {
 
                     ImgCache.isCached(src, function(path, success) {
-
                         if (success) {
-                            setImg(type, el, src);
+                            setImg(type, el, src, function(){
+                                $(el).removeClass('boxLoading');                                                 
+                            });
                         } else {
                             ImgCache.cacheFile(src, function() {
-                                setImg(type, el, src);
+                                $(el).hide();
+                                setImg(type, el, src, function(){
+                                    $(el).removeClass('boxLoading');
+                                    $(el).fadeIn(800);                      
+                                });
                             }, function() {                                
                                 $(el).addClass('default');
-                                $(el).removeClass('boxLoading');                                
-                            });
+                                $(el).removeClass('boxLoading');                         
+                            });                           
                         }
-
                     });
                 });
             }
@@ -101,9 +107,9 @@ angular.module('ImgCache', [])
                 $(el).hide();
 
                 ImgCache.useCachedFileWithSource(el, src, function(){
-                    $(el).fadeIn(1000);
+                    $(el).fadeIn(500);
                 }, function(){
-                    $(el).fadeIn(1000);
+                    $(el).fadeIn(500);
                 });        
             }
 
@@ -228,6 +234,52 @@ angular.module('ImgCache', [])
                             });
                         }
 
+                    });
+                });
+            }
+            
+            attrs.$observe('icSrc', function(src) {
+                loadImg('src', el, src);
+            });
+        }
+    };
+}])
+
+.directive('imgCacheSrcCommon', ['ImgCache', function() {
+
+    return {
+        restrict: 'A',
+        scope: {
+            icSrc: '@'
+        },
+        link: function(scope, el, attrs) {
+
+            var setImg = function(type, el, src, callback) {                
+
+                ImgCache.useCachedFileWithSource(el, src, function(){
+                    if(callback) callback();
+                }, function(){
+                    if(callback) callback();
+                });             
+            }
+
+            var loadImg = function(type, el, src) {        
+                
+                el.attr('src', "images/bg.jpg");
+
+                ImgCache.$promise.then(function() {
+
+                    ImgCache.isCached(src, function(path, success) {
+                        if (success) {
+                            setImg(type, el, src);
+                        } else {
+                            ImgCache.cacheFile(src, function() {   
+                                $(el).hide();
+                                setImg(type, el, src, function(){
+                                    $(el).fadeIn(500);
+                                });
+                            });
+                        }
                     });
                 });
             }

@@ -1,7 +1,7 @@
 <ion-view title="{{catName}}" hide-tabs="true">
     <ion-content>        
         <ion-list>
-            <ion-item ng-repeat="item in plays | orderBy: 'level'" class="item-thumbnail-left level" ng-click='playPlay(item)'>
+            <ion-item ng-repeat="item in skills" class="item-thumbnail-left level" ng-click='play($index)'>
                 <img img-cache-src-common ic-src="{{item.thumb}}">
                 <div class="row">
                     <div class="col col-top col-75"><h2>{{item.name}}</h2></div>

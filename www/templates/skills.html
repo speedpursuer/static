@@ -1,0 +1,15 @@
+<ion-view title="球场技术" hide-tabs="false">
+    <ion-content>       
+		<ion-list>
+			<ion-item ng-repeat="item in cats|orderBy:'count':true" class="item-thumbnail-left" ng-click="showSkills(item.id, item.name)">
+				<img img-cache-src-common ic-src="{{item.thumb}}">			
+				<div class="row">
+					<div class="col col-top col-75 margin-top-1em"><h2>{{item.name}}</h2></div>									
+					<span class="badge badge-assertive margin-top-1em">				
+					{{item.count}}
+				</span>	             								
+				</div>				
+			</ion-item>
+		</ion-list>
+    </ion-content>
+</ion-view>

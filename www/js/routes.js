@@ -113,6 +113,56 @@ angular.module('app.routes', [])
       }
     })
 
+    .state('tabsController.plays', {
+      url: '/plays',
+      views: {
+        'tab4': {
+          controller: 'PlaysCtrl',
+          templateUrl: 'templates/plays.html',
+        }
+      }
+    })
+
+    .state('tabsController.play', {
+      url: '/play/:catID, :catName',
+      resolve: {      
+        plays: ['$stateParams', 'DBService', function($stateParams, DBService) {
+          return DBService.getPlaysByCat($stateParams.catID);
+        }]
+      },
+      views: {
+        'tab4': {
+          controller: 'PlayCtrl',
+          templateUrl: 'templates/play.html',
+        }
+      }
+    })
+
+    .state('tabsController.skills', {
+      url: '/skills',     
+      views: {
+        'tab5': {
+          controller: 'SkillsCtrl',
+          templateUrl: 'templates/skills.html',
+        }
+      }
+    })
+
+    .state('tabsController.skill', {
+      url: '/skill/:catID, :catName',
+      resolve: {      
+        plays: ['$stateParams', 'DBService', function($stateParams, DBService) {
+          return DBService.getSkillsByCat($stateParams.catID);
+        }]
+      },
+      views: {
+        'tab5': {
+          controller: 'SkillCtrl',
+          templateUrl: 'templates/skill.html',
+        }
+      }
+    })
+
     // .state('tabsController.favorite', {
     //   url: '/favorite',      
     //   views: {

@@ -6,7 +6,7 @@ angular.module('app.services', [])
     var service = {};    
 
     var string = {       
-        dbName: dbString? "cliplay": "cliplay_dev",
+        dbName: dbString? "cliplay_prod": "cliplay_dev_3_29",
         remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",
         file: dbString? dbString.split(",")[1]: "db.txt",
         dbAdapter: "websql",
@@ -17,19 +17,140 @@ angular.module('app.services', [])
 
     var isPad = (typeof device !== 'undefined' && device.model.indexOf("iPad") !== -1)? true: false;
 
+    var play = {
+        postInfo: false,
+        playInfo: false,            
+        playPost: function(doc) {  
+            var data = [!this.postInfo, JSON.stringify(doc)];          
+            if(doc.image.length > 1 && !this.postInfo) {
+                this.postInfo = true;
+                db.get("_local/DBInstalled").then(function(doc){
+                    doc.postInfo = true;
+                    return db.put(doc);
+                });         
+            }
+            NativeService.play(data);         
+        },   
+        playPost_: function(list) {
+            var _list = list.slice();            
+            _list.unshift(!this.postInfo);
+            if(list.length > 1 && !this.postInfo) {
+                this.postInfo = true;
+                db.get("_local/DBInstalled").then(function(doc){
+                    doc.postInfo = true;
+                    return db.put(doc);
+                });         
+            }            
+            NativeService.playAnimation(_list);           
+        },
+        playPlay: function(list) {
+            var _list = list.slice();   
+            _list.unshift(!this.playInfo);         
+            if(list.length > 1 && !this.playInfo) {
+                this.playInfo = true;
+                db.get("_local/DBInstalled").then(function(doc){
+                    doc.playInfo = true;
+                    return db.put(doc);
+                });         
+            }            
+            NativeService.playPlay(_list);   
+        },
+        playArticle: function(doc) {          
+            // doc = {
+            //     image: [
+            //         {
+            //             // desc: "it will automatically choose a proper mode by whether you have set auto layout constrants on cell's content view. If you want to enforce frame layout mode, enable this property in your cell's configuration block. In your app, use CocoaPods to manage all of of your app dependencies. That is, don't manually drag-and-drop libraries. use CocoaPods to manage all of of your app dependencies. That is, don't manually drag-and-drop libraries",
+            //             url: "http://i3.hoopchina.com.cn/blogfile/201505/27/BbsImg143268736833456_300*168.gif"
+            //         }, 
+            //         {
+            //             // desc: "In your app, use CocoaPods to manage all of of your app dependencies. That is, don't manually drag-and-drop libraries",
+            //             url: "http://i2.hoopchina.com.cn/blogfile/201409/18/BbsImg141101102762427_230*166.gif"
+            //         }
+            //     ],
+            //     // header: "学明星投篮姿势，最重要的是学大体，大体决定的风格，而不是细节"
+            // };
+            var data = [!this.postInfo, JSON.stringify(doc)];
+            if(doc.image.length > 1 && !this.postInfo) {
+                this.postInfo = true;
+                db.get("_local/DBInstalled").then(function(doc){
+                    doc.postInfo = true;
+                    return db.put(doc);
+                });         
+            }
+            NativeService.playArticle(data);
+        }     
+    };
+
     service.playClipsByMove = function(playerID, moveID) {
         var id = "post_" + playerID + "_" + moveID;
         db.get(id).then(function(result) {            
             if(!result.image instanceof Array) {
                 console.log("Image list not retrieved");    
                 return;
-            }
-            NativeService.playAnimation(result.image);
+            }            
+            play.playPost(result);
         }).catch(function(e){
             console.log(e);
         });      
     };
 
+    service.getGaleryByPlayer = function(playerID) {            
+
+        db.get("galery_" + playerID).then(function (result) {                                                               
+            play.playPost(result);
+        }).catch(function (err) {
+            console.log(e);
+        });
+    };
+
+    service.getSkillsByCat = function(catID) {
+
+        var prefix = "skill_";
+
+        var deferred = $q.defer();
+
+        db.allDocs({
+            include_docs: true,
+            startkey: prefix + catID,
+            endkey: prefix + catID + "\uffff"            
+        }).then(function (result) {
+                                
+            result = result.rows.map(function(row) {                   
+                return row.doc;
+            });                
+            deferred.resolve(result);
+
+        }).catch(function (err) {
+            deferred.reject(err);
+        });
+        
+        return deferred.promise;
+    };
+
+    service.getPlaysByCat = function(catID) {
+
+        var prefix = "plays_";
+
+        var deferred = $q.defer();
+
+        db.allDocs({
+            include_docs: true,
+            startkey: prefix + catID,
+            endkey: prefix + catID + "\uffff"            
+        }).then(function (result) {
+                                
+            result = result.rows.map(function(row) {                   
+                return row.doc;
+            });                
+            deferred.resolve(result);
+
+        }).catch(function (err) {
+            deferred.reject(err);
+        });
+        
+        return deferred.promise;
+    };
+	
     service.list = function() {
         return list;
     };      
@@ -46,6 +167,10 @@ angular.module('app.services', [])
         return remoteDB;
     };
 
+    service.play = function() {
+        return play;
+    };
+
     var list = {
         
         favoriteList: [],
@@ -54,10 +179,30 @@ angular.module('app.services', [])
         clipList: [],
         starList: [],
         newsList: [],
+        playsList: [],
+        skillsList: [],
+
+        getPlaysList: function() {
+            return this.playsList;
+        },
+
+        setPlaysList: function(_list) {
+            this.playsList.length = 0
+            copyList(this.playsList, _list);
+        },
+
+        getSkillsList: function() {
+            return this.skillsList;
+        },
+
+        setSkillsList: function(_list) {
+            this.skillsList.length = 0
+            copyList(this.skillsList, _list);
+        },
 
         getStarList: function(){
             return this.starList;
-        },
+        },      
 
         setClipList: function(_list) {                 
             copyList(this.clipList, _list);
@@ -74,6 +219,10 @@ angular.module('app.services', [])
         setNewsList: function(_list) {                 
             copyList(this.newsList, _list);
         },
+
+        addNewsList: function(_list) {                 
+            copyListToFront(this.newsList, _list);
+        },        
 
         resetNewsList: function() {     
             this.newsList.length = 0;                 
@@ -171,14 +320,17 @@ angular.module('app.services', [])
             });
 
             return deferred.promise;
-        },
+        }, 
 
         getMovesByPlayer: function(playerID) {
-            var deferred = $q.defer();            
+            
+            var deferred = $q.defer();      
+
+            var moves = [];
 
             db.get(playerID).then(function(result){
 
-                var moves = result.clip_moves;
+                moves = result.clip_moves;
 
                 var keys = [];
 
@@ -186,28 +338,27 @@ angular.module('app.services', [])
                     if(parseInt(moves[i]) > 0) keys.push(i);
                 }
                 
-                db.allDocs({
+                return db.allDocs({
                     include_docs: true,
                     keys: keys
-                }).then(function (result) {
-                                        
-                    result = result.rows.map(function(row) {
-                        row.doc.clipQty = moves[row.doc._id];   
-                        row.doc.name = row.doc.move_name;
-                        return row.doc;
-                    });
-
-                    deferred.resolve(result);
-
-                }).catch(function (err) {
-                    deferred.reject(err);
                 });
-            }).catch(function(){
 
-            });          
+            }).then(function (result) {
+                                    
+                result = result.rows.map(function(row) {
+                    row.doc.clipQty = moves[row.doc._id];   
+                    row.doc.name = row.doc.move_name;
+                    return row.doc;
+                });
+
+                deferred.resolve(result);
+
+            }).catch(function (err) {
+                deferred.reject(err);
+            });            
 
             return deferred.promise;       
-        },    
+        },   
     };      
 
     var pagination = {       
@@ -229,13 +380,82 @@ angular.module('app.services', [])
             end: {noMore: true},
             limit: isPad? 12: 7,    
             descending: true,           
-            init: function(playerID, moveID) {                
+            init: function() {                
                 this.options = {descending : this.descending, include_docs: true, limit : this.limit, endkey: "news_", startkey: "news_" + "\uffff"};                                
                 list.resetNewsList();
                 this.end.noMore = true;
                 return this.getNews();
             },
-            
+
+            refresh: function() {
+
+                var deferred = $q.defer();
+
+                var newsList = list.getNewsList();
+                var curLast = newsList[0];
+
+                var curStarkey = this.options.startkey;
+                var curNoMore = this.end.noMore;
+
+                this.options = {descending : this.descending, include_docs: true, limit : this.limit, endkey: "news_", startkey: "news_" + "\uffff"};
+                // this.end.noMore = true;
+
+                var that = this;
+
+                var _options = that.options;
+                var _end = that.end;
+                
+                db.allDocs(_options).then(function (result) {
+
+                    if (result && result.rows.length > 0) {
+
+                        _options.startkey = result.rows[result.rows.length - 1].key;
+
+                        result = result.rows.map(function(row) {                            
+                            return row.doc;
+                        });    
+
+                        if(result.length < that.limit) {
+                            that.end.noMore = true;
+                        }else{
+                            that.end.noMore = false;
+                        }
+
+                        if(result.length == that.limit) {
+                            result.splice(-1,1);
+                        }                                                
+
+                        return result;                                             
+                    }else{                       
+                        that.end.noMore = true;            
+                        return null;
+                    }                                                        
+
+                }).then(function(result){
+                    if(result) {
+                        var index = findIndexR(result, curLast._id);
+                        if(index == -1) {
+                            list.resetNewsList();
+                            list.setNewsList(result);
+                        }else {
+                            if(index != 0) {
+                                var add = result.slice(0, index);
+                                list.addNewsList(add);
+                            }                                
+                            _options.startkey = curStarkey;
+                            _end.noMore = curNoMore;
+                        }
+                    }
+                    return true;                    
+                }).then(function(){
+                    deferred.resolve(true);
+                }).catch(function (err) {
+                    deferred.reject(err);
+                });
+
+                return deferred.promise;
+            },
+
             more: function(callback) {            
                 this.getNews()
                 .catch(function(){
@@ -507,7 +727,12 @@ angular.module('app.services', [])
         syncRemote: function(callback) {
             syncFromRemote().then(function(result) {
                 if(result.docs_written > 0) {                  
-                    return refreshAllPlayers().then(retrieveNews);                    
+                // if(true){
+                    // return refreshAllPlayers().then(retrieveNews).then(retrievePlaysCats);                    
+                    return retrieveAllPlayers(true)                        
+                        .then(retrievePlaysCats)
+                        .then(retrieveSkillCats)
+                        .then(refreshNews);
                 }else{                    
                     return true;
                 }
@@ -688,8 +913,9 @@ angular.module('app.services', [])
         // dataProcess.init(); return;
         createDB();        
                 
-        isDBInstalled()
-        .then(function() {        
+        isDBInstalled().then(function(result) {       
+            if(result.postInfo) play.postInfo = true;
+            if(result.playInfo) play.playInfo = true;
             syncData(deferred, false);
         }).catch(function(e) {
             //ErrorService.showProgress();          
@@ -741,9 +967,11 @@ angular.module('app.services', [])
     function retrieveLists(isInstall) {
         var list = [];
         list.push(retrieveAllPlayers());
-        list.push(retrieveAllMoves());
+        // list.push(retrieveAllMoves());
         //if(!isInstall) list.push(retrieveFavorites());
         list.push(retrieveNews());
+        list.push(retrievePlaysCats());
+        list.push(retrieveSkillCats());    
         return executePromises(list);
     }
 
@@ -833,12 +1061,16 @@ angular.module('app.services', [])
         return pagination.news().init();
     }
 
+    function refreshNews() {
+        return pagination.news().refresh();
+    }
+
     function retrieveAllMoves() {
         //console.log("ready for retrieveAllMoves");
         return dataFetcher.getMoves();
     }
 
-    function retrieveAllPlayers() {
+    function retrieveAllPlayers(refresh) {
         // console.log("ready for retrieveAllPlayers");
         var deferred = $q.defer();
 
@@ -852,15 +1084,15 @@ angular.module('app.services', [])
                 return row.doc;
             });
 
-            for(i in result) {                
-                if (result[i].star) {
-                    list.starList.push(result[i]);
-                }               
+            if(!refresh) {                
+                for(i in result) {                
+                    if (result[i].star) {
+                        list.starList.push(result[i]);
+                    }               
+                }
             }
 
-            list.setPlayerList(result);
-
-            // console.log("finished retrieveAllPlayers");
+            list.setPlayerList(result);           
 
             deferred.resolve("All players retrieved");
 
@@ -869,6 +1101,28 @@ angular.module('app.services', [])
         });
 
         return deferred.promise;
+    }
+
+    function retrievePlaysCats() {
+        return $q(function(resolve, reject) {
+            retrieveDoc("plays").then(function(doc) {            
+                list.setPlaysList(doc.category);                
+                resolve("plays retrieved");
+            }).catch(function(e){
+                reject(e);
+            });
+        });            
+    }
+
+     function retrieveSkillCats() {
+        return $q(function(resolve, reject) {
+            retrieveDoc("skills").then(function(doc) {            
+                list.setSkillsList(doc.cats);     
+                resolve("skills retrieved");
+            }).catch(function(e){
+                reject(e);
+            });
+        });            
     }
 
     function refreshAllPlayers() {
@@ -909,9 +1163,23 @@ angular.module('app.services', [])
         desc.push.apply(desc, source);
     }
 
+    function copyListToFront(desc, source) {
+        desc.unshift.apply(desc, source);
+    }
+
     function getDoc(id) {
         return db.get(id);
     }
+
+    function retrieveDoc(id) {
+        return $q(function(resolve, reject) {
+            db.get(id).then(function(doc){
+                resolve(doc);
+            }).catch(function(e){
+                reject(e);
+            })
+        });
+    };
 
     function deleteDB() {      
         db.destroy().then(function (response) {
@@ -936,8 +1204,9 @@ angular.module('app.services', [])
         if(db) {
             db = null;
         }
-        db = pouchdb.create(string.dbName, {size: 40, adapter: string.dbAdapter, auto_compaction: false});
-        // deleteDB();        
+        // db = pouchdb.create(string.dbName, {size: 40, adapter: string.dbAdapter, auto_compaction: false});
+        db = pouchdb.create(string.dbName, {auto_compaction: false});
+        // deleteDB();       
     }
 
     function syncFromRemote() {     
@@ -1052,6 +1321,19 @@ angular.module('app.services', [])
                 return mid;
             }else{
                 array[mid]._id < id ? low = mid + 1 : high = mid    
+            }
+        }
+        return -1;
+    }
+
+    function findIndexR(array, id) {  
+        var low = 0, high = array.length, mid;
+        while (low < high) {
+            mid = (low + high) >>> 1;
+            if(array[mid]._id == id) {
+                return mid;
+            }else{
+                array[mid]._id > id ? low = mid + 1 : high = mid    
             }
         }
         return -1;
@@ -1175,7 +1457,7 @@ angular.module('app.services', [])
 
 .factory('NativeService', function() {
     
-    var service = {}
+    var service = {}   
     
     var win = function(d) {                                
     };
@@ -1184,8 +1466,20 @@ angular.module('app.services', [])
         console.log(e)
     };
     
-    service.playAnimation = function(list) {        
+    service.playAnimation = function(list) {
         cordova.exec(win, fail, "MyHybridPlugin", "playClip", list);
+    };
+
+    service.playPlay = function(list) {        
+        cordova.exec(win, fail, "MyHybridPlugin", "playPlay", list);
+    };
+
+    service.playArticle = function(list) {        
+        cordova.exec(win, fail, "MyHybridPlugin", "showArticle", list);
+    };
+
+    service.play = function(list) {        
+        cordova.exec(win, fail, "MyHybridPlugin", "play", list);
     };
 
     // service.playAnimation = function(clipURL, favorite, showFavBut) {
@@ -1206,9 +1500,8 @@ angular.module('app.services', [])
 })
 
 .factory('ErrorService', ['$rootScope', '$cordovaSplashscreen', '$ionicPopup', '$ionicLoading', '$timeout', 'NativeService', function($rootScope, $cordovaSplashscreen, $ionicPopup, $ionicLoading, $timeout, NativeService) {
-                
-         
-    var service = {};        
+                         
+    var service = {};
 
     service.showSplashScreen = function() {
         $cordovaSplashscreen.show();

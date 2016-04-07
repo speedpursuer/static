@@ -11,7 +11,8 @@ angular.module('app.controllers', [])
   	};
 
   	function cacheViews() {		
-		$state.go("tabsController.players");
+		// $state.go("tabsController.players");
+		$state.go("tabsController.news");
   	}
 }])
 
@@ -22,7 +23,8 @@ angular.module('app.controllers', [])
 	$ionicSlideBoxDelegate.slide(0);						
 
  	$scope.showMoves = function(playerID, playerName) {
-		$state.go("tabsController.moves", {playerID: playerID, playerName: playerName});
+		// $state.go("tabsController.moves", {playerID: playerID, playerName: playerName});
+		DBService.getGaleryByPlayer(playerID);
 	};	
 }])
    
@@ -171,31 +173,31 @@ angular.module('app.controllers', [])
 
 .controller('PlayersCtrl', ['$scope', '$state', 'DBService', 'ErrorService', '$timeout', function($scope, $state, DBService, ErrorService, $timeout) {
 
-	$scope.$on("$ionicView.loaded", function() {
-    	$timeout(function() {
-    		$scope.$broadcast('scroll.refreshStart');
-    	}, 300);    
-  	});
+	// $scope.$on("$ionicView.loaded", function() {
+ //    	$timeout(function() {
+ //    		$scope.$broadcast('scroll.refreshStart');
+ //    	}, 300);    
+ //  	});
 
 	$scope.players = DBService.list().getPlayerList();
-	ErrorService.hideSplashScreen();
+	// ErrorService.hideSplashScreen();
 
-	$scope.doRefresh = function() {
-		DBService.remoteDB().syncRemote(function() {
-			$scope.$broadcast('scroll.refreshComplete');
-		});
-	};	
+	// $scope.doRefresh = function() {
+	// 	DBService.remoteDB().syncRemote(function() {
+	// 		$scope.$broadcast('scroll.refreshComplete');
+	// 	});
+	// };	
 		
 	$scope.showMoves = function(playerID, playerName) {
 		$state.go("tabsController.tab2Moves", {playerID: playerID, playerName: playerName});
 	};
 
 	$scope.myFilter = function (item) { 
-	    return item.clip_total > 0; 
+	    return item.clip_total > 4; 
 	};
 }])
 
-.controller('MovesCtrl', ['$scope', '$state', '$stateParams', 'moves', 'DBService', function($scope, $state, $stateParams, moves, DBService) {
+.controller('MovesCtrl', ['$scope', '$stateParams', 'moves', 'DBService', function($scope, $stateParams, moves, DBService) {
 
 	$scope.moves = moves;
 	$scope.playerName = $stateParams.playerName;
@@ -207,7 +209,7 @@ angular.module('app.controllers', [])
 
 }])
 
-.controller('Tab2MovesCtrl', ['$scope', '$state', '$stateParams', 'moves', 'DBService', function($scope, $state, $stateParams, moves, DBService) {
+.controller('Tab2MovesCtrl', ['$scope', '$stateParams', 'moves', 'DBService', function($scope, $stateParams, moves, DBService) {
 	$scope.moves = moves;
 	$scope.playerName = $stateParams.playerName;
 
@@ -222,9 +224,12 @@ angular.module('app.controllers', [])
 
 }])
 
-.controller('NewsCtrl', ['$scope', '$state', '$stateParams', 'DBService', 'NativeService', function($scope, $state, $stateParams, DBService, NativeService) {
+.controller('NewsCtrl', ['$scope', '$state', '$stateParams', 'DBService', 'ErrorService', '$timeout', function($scope, $state, $stateParams, DBService, ErrorService, $timeout) {	
+
 	$scope.noMoreItemsAvailable = DBService.pagination().news().hasNoMore();
  	$scope.news = DBService.list().getNewsList();
+
+ 	ErrorService.hideSplashScreen();
 
  	$scope.loadMore = function() { 
 		DBService.pagination().news().more(function() {
@@ -235,8 +240,73 @@ angular.module('app.controllers', [])
 	$scope.showClips = function(index) {
 		DBService.readNews($scope.news[index])
 		.finally(function(){
-			console.log("playAnimation");
-			NativeService.playAnimation($scope.news[index].image);
+			DBService.play().playPost($scope.news[index]);
+			// NativeService.playAnimation($scope.news[index].image);			
+			// DBService.play().playPost($scope.news[index].image);
 		});		
+	};
+
+	$scope.doRefresh = function() {
+		DBService.remoteDB().syncRemote(function() {
+			$scope.$broadcast('scroll.refreshComplete');
+		});
+	};
+
+	$scope.$on("$ionicView.loaded", function() {
+    	$timeout(function() {
+    		$scope.$broadcast('scroll.refreshStart');
+    	}, 300);    
+  	});
+}])
+
+.controller('PlaysCtrl', ['$scope', '$state', 'DBService', function($scope, $state, DBService) {
+
+    $scope.cats = DBService.list().getPlaysList();
+
+	$scope.myFilter = function (item) { 
+	    return item.quantity > 0; 
+	};
+
+	$scope.showPlays = function(id, name) {	
+		$state.go("tabsController.play", {catID: id, catName: name});	
+	};
+}])
+
+.controller('PlayCtrl', ['$scope', '$stateParams', 'DBService', 'plays', function($scope, $stateParams, DBService, plays) {
+
+	$scope.plays = plays;
+
+	$scope.catName = $stateParams.catName;
+
+	$scope.playPlay = function(item) {
+		// NativeService.playPlay($scope.plays[index].image);	
+		// DBService.play().playPlay($scope.plays[index].image);
+		DBService.play().playPlay(item.image);
+	};
+}])
+
+.controller('SkillsCtrl', ['$scope', '$state', 'DBService', function($scope, $state, DBService) {
+
+    $scope.cats = DBService.list().getSkillsList();
+
+	$scope.myFilter = function (item) { 
+	    return item.count > 0; 
+	};
+
+	$scope.showSkills = function(id, name) {	
+		$state.go("tabsController.skill", {catID: id, catName: name});	
+	};
+}])
+
+.controller('SkillCtrl', ['$scope', '$stateParams', 'DBService', 'plays', function($scope, $stateParams, DBService, skills) {
+
+	$scope.skills = skills;
+
+	$scope.catName = $stateParams.catName;
+
+	$scope.play = function(item) {		
+		// DBService.play().playPost($scope.skills[index].image);
+		// DBService.play().playArticle($scope.skills[index]);
+		DBService.play().playArticle(item);
 	};
 }])

@@ -20,7 +20,7 @@ angular.module('app.services', [])
     var play = {
         postInfo: false,
         playInfo: false,            
-        playPost: function(doc) {  
+        playPost: function(doc) {    
             var data = [!this.postInfo, JSON.stringify(doc)];          
             if(doc.image.length > 1 && !this.postInfo) {
                 this.postInfo = true;
@@ -30,19 +30,7 @@ angular.module('app.services', [])
                 });         
             }
             NativeService.play(data);         
-        },   
-        playPost_: function(list) {
-            var _list = list.slice();            
-            _list.unshift(!this.postInfo);
-            if(list.length > 1 && !this.postInfo) {
-                this.postInfo = true;
-                db.get("_local/DBInstalled").then(function(doc){
-                    doc.postInfo = true;
-                    return db.put(doc);
-                });         
-            }            
-            NativeService.playAnimation(_list);           
-        },
+        },        
         playPlay: function(list) {
             var _list = list.slice();   
             _list.unshift(!this.playInfo);         
@@ -81,22 +69,33 @@ angular.module('app.services', [])
         }     
     };
 
-    service.playClipsByMove = function(playerID, moveID) {
+    service.checkPush = function() {
+        NativeService.checkPush();
+    };
+
+    service.playNews = function(news) {
+        news.header = news.name;
+        play.playPost(news);
+    }
+
+    service.playClipsByMove = function(playerID, moveID, moveName) {
         var id = "post_" + playerID + "_" + moveID;
         db.get(id).then(function(result) {            
             if(!result.image instanceof Array) {
                 console.log("Image list not retrieved");    
                 return;
-            }            
+            }
+            result.header = moveName;            
             play.playPost(result);
         }).catch(function(e){
             console.log(e);
         });      
     };
 
-    service.getGaleryByPlayer = function(playerID) {            
+    service.getGaleryByPlayer = function(playerID, playerName) {            
 
-        db.get("galery_" + playerID).then(function (result) {                                                               
+        db.get("galery_" + playerID).then(function (result) {      
+            result.header = playerName;                                                        
             play.playPost(result);
         }).catch(function (err) {
             console.log(e);
@@ -730,8 +729,8 @@ angular.module('app.services', [])
                 // if(true){
                     // return refreshAllPlayers().then(retrieveNews).then(retrievePlaysCats);                    
                     return retrieveAllPlayers(true)                        
-                        .then(retrievePlaysCats)
-                        .then(retrieveSkillCats)
+                        // .then(retrievePlaysCats)
+                        // .then(retrieveSkillCats)
                         .then(refreshNews);
                 }else{                    
                     return true;
@@ -970,8 +969,8 @@ angular.module('app.services', [])
         // list.push(retrieveAllMoves());
         //if(!isInstall) list.push(retrieveFavorites());
         list.push(retrieveNews());
-        list.push(retrievePlaysCats());
-        list.push(retrieveSkillCats());    
+        // list.push(retrievePlaysCats());
+        // list.push(retrieveSkillCats());    
         return executePromises(list);
     }
 
@@ -1033,7 +1032,8 @@ angular.module('app.services', [])
 
     function installFail() {
         string.installFail = true;
-        ErrorService.showAlert("安装遇到小问题", "请点击重试。", true);       
+        // ErrorService.showAlert("安装遇到小问题", "请点击重试。", true);       
+        ErrorService.showAlert("启动遇到问题", "请您重新下载安装。", false);
     }
 
     function syncFail() {
@@ -1480,6 +1480,10 @@ angular.module('app.services', [])
 
     service.play = function(list) {        
         cordova.exec(win, fail, "MyHybridPlugin", "play", list);
+    };
+
+    service.checkPush = function() {
+        cordova.exec(win, fail, "MyHybridPlugin", "checkPush", []);
     };
 
     // service.playAnimation = function(clipURL, favorite, showFavBut) {

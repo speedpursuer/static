@@ -4,7 +4,7 @@
 			<ion-item ng-repeat="item in cats|orderBy:'count':true" class="item-thumbnail-left" ng-click="showSkills(item.id, item.name)">
 				<img img-cache-src-common ic-src="{{item.thumb}}">			
 				<div class="row">
-					<div class="col col-top col-75 margin-top-1em"><h2>{{item.name}}</h2></div>									
+					<div class="col col-top col-75 margin-top-1em name-center"><h2>{{item.name}}</h2></div>									
 					<span class="badge badge-assertive margin-top-1em">				
 					{{item.count}}
 				</span>	             								

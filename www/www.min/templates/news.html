@@ -1,4 +1,9 @@
 <ion-view title="最新信息" hide-tabs="false">
+	<ion-nav-buttons side="right">
+    	<button class="button" ng-click="cleanCache()">
+       		<i class="ion-trash-b basketball"></i>
+      	</button>
+    </ion-nav-buttons>	
     <ion-content>    	 
     	<ion-refresher
             pulling-text="下拉获取更新..."
@@ -8,10 +13,11 @@
 			<ion-item ng-repeat="item in news" class="item-thumbnail-left news" ng-click='showClips($index)'>
 				<img img-cache-src-common ic-src="{{item.thumb}}">
 				<div class="row">
-					<div class="col col-top col-90"><h2>{{item.name}}</h2></div>			
+					<div class="col col-top"><h2>{{item.name}}</h2></div>			
+					<!-- <div class="col col-top col-90"><h2>{{item.name}}</h2></div>			
 					<div class="col col-top col-10" ng-show="!item.read">
 						<i class="ion-ios-basketball basketball"></i>
-					</div>
+					</div> -->
 				</div>
 				<div class="row">
 					<div class="col col-top"><p>{{item.desc}}</p></div>

@@ -248,7 +248,7 @@ angular.module('app.services', [])
     var play = {
         postInfo: false,
         playInfo: false,            
-        playPost: function(doc) {  
+        playPost: function(doc) {    
             var data = [!this.postInfo, JSON.stringify(doc)];          
             if(doc.image.length > 1 && !this.postInfo) {
                 this.postInfo = true;
@@ -258,19 +258,7 @@ angular.module('app.services', [])
                 });         
             }
             NativeService.play(data);         
-        },   
-        playPost_: function(list) {
-            var _list = list.slice();            
-            _list.unshift(!this.postInfo);
-            if(list.length > 1 && !this.postInfo) {
-                this.postInfo = true;
-                db.get("_local/DBInstalled").then(function(doc){
-                    doc.postInfo = true;
-                    return db.put(doc);
-                });         
-            }            
-            NativeService.playAnimation(_list);           
-        },
+        },        
         playPlay: function(list) {
             var _list = list.slice();   
             _list.unshift(!this.playInfo);         
@@ -283,7 +271,20 @@ angular.module('app.services', [])
             }            
             NativeService.playPlay(_list);   
         },
-        playArticle: function(doc) {                    
+        playArticle: function(doc) {          
+            // doc = {
+            //     image: [
+            //         {
+            //             // desc: "it will automatically choose a proper mode by whether you have set auto layout constrants on cell's content view. If you want to enforce frame layout mode, enable this property in your cell's configuration block. In your app, use CocoaPods to manage all of of your app dependencies. That is, don't manually drag-and-drop libraries. use CocoaPods to manage all of of your app dependencies. That is, don't manually drag-and-drop libraries",
+            //             url: "http://i3.hoopchina.com.cn/blogfile/201505/27/BbsImg143268736833456_300*168.gif"
+            //         }, 
+            //         {
+            //             // desc: "In your app, use CocoaPods to manage all of of your app dependencies. That is, don't manually drag-and-drop libraries",
+            //             url: "http://i2.hoopchina.com.cn/blogfile/201409/18/BbsImg141101102762427_230*166.gif"
+            //         }
+            //     ],
+            //     // header: "学明星投篮姿势，最重要的是学大体，大体决定的风格，而不是细节"
+            // };
             var data = [!this.postInfo, JSON.stringify(doc)];
             if(doc.image.length > 1 && !this.postInfo) {
                 this.postInfo = true;
@@ -296,22 +297,33 @@ angular.module('app.services', [])
         }     
     };
 
-    service.playClipsByMove = function(playerID, moveID) {
+    service.checkPush = function() {
+        NativeService.checkPush();
+    };
+
+    service.playNews = function(news) {
+        news.header = news.name;
+        play.playPost(news);
+    }
+
+    service.playClipsByMove = function(playerID, moveID, moveName) {
         var id = "post_" + playerID + "_" + moveID;
         db.get(id).then(function(result) {            
             if(!result.image instanceof Array) {
                 console.log("Image list not retrieved");    
                 return;
-            }            
+            }
+            result.header = moveName;            
             play.playPost(result);
         }).catch(function(e){
             console.log(e);
         });      
     };
 
-    service.getGaleryByPlayer = function(playerID) {            
+    service.getGaleryByPlayer = function(playerID, playerName) {            
 
-        db.get("galery_" + playerID).then(function (result) {                                                               
+        db.get("galery_" + playerID).then(function (result) {      
+            result.header = playerName;                                                        
             play.playPost(result);
         }).catch(function (err) {
             console.log(e);
@@ -652,9 +664,11 @@ angular.module('app.services', [])
                         if(index == -1) {
                             list.resetNewsList();
                             list.setNewsList(result);
-                        }else if(index != 0){                            
-                            var add = result.slice(0, index);
-                            list.addNewsList(add);
+                        }else {
+                            if(index != 0) {
+                                var add = result.slice(0, index);
+                                list.addNewsList(add);
+                            }                                
                             _options.startkey = curStarkey;
                             _end.noMore = curNoMore;
                         }
@@ -943,8 +957,8 @@ angular.module('app.services', [])
                 // if(true){
                     // return refreshAllPlayers().then(retrieveNews).then(retrievePlaysCats);                    
                     return retrieveAllPlayers(true)                        
-                        .then(retrievePlaysCats)
-                        .then(retrieveSkillCats)
+                        // .then(retrievePlaysCats)
+                        // .then(retrieveSkillCats)
                         .then(refreshNews);
                 }else{                    
                     return true;
@@ -1183,8 +1197,8 @@ angular.module('app.services', [])
         // list.push(retrieveAllMoves());
         //if(!isInstall) list.push(retrieveFavorites());
         list.push(retrieveNews());
-        list.push(retrievePlaysCats());
-        list.push(retrieveSkillCats());    
+        // list.push(retrievePlaysCats());
+        // list.push(retrieveSkillCats());    
         return executePromises(list);
     }
 
@@ -1246,7 +1260,8 @@ angular.module('app.services', [])
 
     function installFail() {
         string.installFail = true;
-        ErrorService.showAlert("安装遇到小问题", "请点击重试。", true);       
+        // ErrorService.showAlert("安装遇到小问题", "请点击重试。", true);       
+        ErrorService.showAlert("启动遇到问题", "请您重新下载安装。", false);
     }
 
     function syncFail() {
@@ -1695,6 +1710,10 @@ angular.module('app.services', [])
         cordova.exec(win, fail, "MyHybridPlugin", "play", list);
     };
 
+    service.checkPush = function() {
+        cordova.exec(win, fail, "MyHybridPlugin", "checkPush", []);
+    };
+
     // service.playAnimation = function(clipURL, favorite, showFavBut) {
     //     favorite = favorite? "true": "false";
     //     showFavBut = showFavBut? "true": "false";
@@ -1788,7 +1807,7 @@ angular.module('app.controllers', [])
 
  	$scope.showMoves = function(playerID, playerName) {
 		// $state.go("tabsController.moves", {playerID: playerID, playerName: playerName});
-		DBService.getGaleryByPlayer(playerID);
+		DBService.getGaleryByPlayer(playerID, playerName);
 	};	
 }])
    
@@ -1968,7 +1987,7 @@ angular.module('app.controllers', [])
 
 	$scope.showClips = function(moveName, moveID) {
 		//$state.go("tabsController.clips", {playerID: $stateParams.playerID, moveName: moveName, moveID: moveID});
-		DBService.playClipsByMove($stateParams.playerID, moveID);
+		DBService.playClipsByMove($stateParams.playerID, moveID, moveName);
 	};
 
 }])
@@ -1979,7 +1998,7 @@ angular.module('app.controllers', [])
 
 	$scope.showClips = function(moveName, moveID) {
 		//$state.go("tabsController.tab2Clips", {playerID: $stateParams.playerID, moveName: moveName, moveID: moveID});
-		DBService.playClipsByMove($stateParams.playerID, moveID);
+		DBService.playClipsByMove($stateParams.playerID, moveID, moveName);
 	};
 
 	// $scope.showClips = function(moveName, moveID) {
@@ -1995,6 +2014,8 @@ angular.module('app.controllers', [])
 
  	ErrorService.hideSplashScreen();
 
+ 	var firstTime = true;
+
  	$scope.loadMore = function() { 
 		DBService.pagination().news().more(function() {
 			$scope.$broadcast('scroll.infiniteScrollComplete');
@@ -2002,24 +2023,31 @@ angular.module('app.controllers', [])
   	};	
 
 	$scope.showClips = function(index) {
-		DBService.readNews($scope.news[index])
-		.finally(function(){
-			DBService.play().playPost($scope.news[index]);
-			// NativeService.playAnimation($scope.news[index].image);			
-			// DBService.play().playPost($scope.news[index].image);
-		});		
+		// DBService.readNews($scope.news[index])
+		// .finally(function(){
+		// 	DBService.play().playPost($scope.news[index]);			
+		// });
+		DBService.playNews($scope.news[index]);		
 	};
 
 	$scope.doRefresh = function() {
 		DBService.remoteDB().syncRemote(function() {
 			$scope.$broadcast('scroll.refreshComplete');
+			if(firstTime) {
+				DBService.checkPush();
+				firstTime = false;
+			}
 		});
+	};
+
+	$scope.cleanCache = function() {
+		ErrorService.showAlert("删除已下载短片", "释放磁盘空间", true);
 	};
 
 	$scope.$on("$ionicView.loaded", function() {
     	$timeout(function() {
     		$scope.$broadcast('scroll.refreshStart');
-    	}, 300);    
+    	}, 300);    	
   	});
 }])
 
@@ -2042,9 +2070,10 @@ angular.module('app.controllers', [])
 
 	$scope.catName = $stateParams.catName;
 
-	$scope.playPlay = function(index) {
+	$scope.playPlay = function(item) {
 		// NativeService.playPlay($scope.plays[index].image);	
-		DBService.play().playPlay($scope.plays[index].image);
+		// DBService.play().playPlay($scope.plays[index].image);
+		DBService.play().playPlay(item.image);
 	};
 }])
 
@@ -2067,9 +2096,10 @@ angular.module('app.controllers', [])
 
 	$scope.catName = $stateParams.catName;
 
-	$scope.play = function(index) {		
+	$scope.play = function(item) {		
 		// DBService.play().playPost($scope.skills[index].image);
-		DBService.play().playArticle($scope.skills[index]);
+		// DBService.play().playArticle($scope.skills[index]);
+		DBService.play().playArticle(item);
 	};
 }]);
 

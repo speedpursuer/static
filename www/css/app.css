@@ -18,8 +18,20 @@
 }
 
 .ion-ios-star {
-  font-size: 50%;
+  font-size: 90%;
 }
+
+.name-center {
+  margin-left: 2em;
+}
+
+.player-name {
+  margin-left: 1em !important;; 
+}
+
+/*.badge-assertive {
+  font-size: 70%; 
+}*/
 
 ion-tabs.tabs-color-active-assertive .tab-item.tab-item-active, .basketball{
   color: #FF4000;

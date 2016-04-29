@@ -24,7 +24,7 @@ angular.module('app.controllers', [])
 
  	$scope.showMoves = function(playerID, playerName) {
 		// $state.go("tabsController.moves", {playerID: playerID, playerName: playerName});
-		DBService.getGaleryByPlayer(playerID);
+		DBService.getGaleryByPlayer(playerID, playerName);
 	};	
 }])
    
@@ -204,7 +204,7 @@ angular.module('app.controllers', [])
 
 	$scope.showClips = function(moveName, moveID) {
 		//$state.go("tabsController.clips", {playerID: $stateParams.playerID, moveName: moveName, moveID: moveID});
-		DBService.playClipsByMove($stateParams.playerID, moveID);
+		DBService.playClipsByMove($stateParams.playerID, moveID, moveName);
 	};
 
 }])
@@ -215,7 +215,7 @@ angular.module('app.controllers', [])
 
 	$scope.showClips = function(moveName, moveID) {
 		//$state.go("tabsController.tab2Clips", {playerID: $stateParams.playerID, moveName: moveName, moveID: moveID});
-		DBService.playClipsByMove($stateParams.playerID, moveID);
+		DBService.playClipsByMove($stateParams.playerID, moveID, moveName);
 	};
 
 	// $scope.showClips = function(moveName, moveID) {
@@ -231,6 +231,8 @@ angular.module('app.controllers', [])
 
  	ErrorService.hideSplashScreen();
 
+ 	var firstTime = true;
+
  	$scope.loadMore = function() { 
 		DBService.pagination().news().more(function() {
 			$scope.$broadcast('scroll.infiniteScrollComplete');
@@ -238,24 +240,31 @@ angular.module('app.controllers', [])
   	};	
 
 	$scope.showClips = function(index) {
-		DBService.readNews($scope.news[index])
-		.finally(function(){
-			DBService.play().playPost($scope.news[index]);
-			// NativeService.playAnimation($scope.news[index].image);			
-			// DBService.play().playPost($scope.news[index].image);
-		});		
+		// DBService.readNews($scope.news[index])
+		// .finally(function(){
+		// 	DBService.play().playPost($scope.news[index]);			
+		// });
+		DBService.playNews($scope.news[index]);		
 	};
 
 	$scope.doRefresh = function() {
 		DBService.remoteDB().syncRemote(function() {
 			$scope.$broadcast('scroll.refreshComplete');
+			if(firstTime) {
+				DBService.checkPush();
+				firstTime = false;
+			}
 		});
+	};
+
+	$scope.cleanCache = function() {
+		ErrorService.showAlert("删除已下载短片", "释放磁盘空间", true);
 	};
 
 	$scope.$on("$ionicView.loaded", function() {
     	$timeout(function() {
     		$scope.$broadcast('scroll.refreshStart');
-    	}, 300);    
+    	}, 300);    	
   	});
 }])
 

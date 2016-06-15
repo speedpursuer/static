@@ -1,3 +1,10 @@
+// Ionic Starter App
+
+// angular.module is a global place for creating, registering and retrieving Angular modules
+// 'starter' is the name of this angular module example (also set in a <body> attribute in index.html)
+// the 2nd parameter is an array of 'requires'
+// 'starter.services' is found in services.js
+// 'starter.controllers' is found in controllers.js
 angular.module('app', ['ionic', 'app.controllers', 'app.routes', 'app.services', 'app.directives', 'pouchdb', 'ImgCache', 'ngCordova'])
 
 .config(['$ionicConfigProvider', 'ImgCacheProvider', function($ionicConfigProvider, ImgCacheProvider) {
@@ -12,9 +19,12 @@ angular.module('app', ['ionic', 'app.controllers', 'app.routes', 'app.services',
 
     $ionicConfigProvider.views.swipeBackEnabled(false);
     $ionicConfigProvider.scrolling.jsScrolling(false);
+    $ionicConfigProvider.tabs.position('bottom'); // other values: top
+    $ionicConfigProvider.tabs.style('standard');
+    // $ionicConfigProvider.views.maxCache(20);
 }])
 
-.run(['$ionicPlatform', '$cordovaStatusbar', '$rootScope', function($ionicPlatform, $cordovaStatusbar, $rootScope) {
+.run(['$ionicPlatform', '$cordovaStatusbar', '$rootScope', '$ionicHistory', function($ionicPlatform, $cordovaStatusbar, $rootScope, $ionicHistory) {
     $ionicPlatform.ready(function() {
       // Hide the accessory bar by default (remove this to show the accessory bar above the keyboard
       // for form inputs)
@@ -33,9 +43,17 @@ angular.module('app', ['ionic', 'app.controllers', 'app.routes', 'app.services',
 
     $rootScope.$on('$stateChangeError', 
       function(event, toState, toParams, fromState, fromParams, error){
-        console.log("stateChangeError");  
+        console.log("stateChangeError: " + error);  
         event.preventDefault();
     });
+    
+    if(ionic.Platform.isAndroid()) {
+		$ionicPlatform.registerBackButtonAction(function () {
+	      if ($ionicHistory.backView()) {
+    	    navigator.app.backHistory();
+     	  }
+	    }, 100);
+	}
     
     /*
     window.addEventListener("orientationchange", function(){
@@ -229,13 +247,13 @@ angular.module('app.routes', [])
 angular.module('app.services', [])
 
 
-.factory('DBService', ['$q', '$timeout', 'pouchdb', 'ErrorService', 'FileCacheService', 'NativeService', function($q, $timeout, pouchdb, ErrorService, FileCacheService, NativeService) {
-
+.factory('DBService', ['$q', '$timeout', 'pouchdb', 'ErrorService', 'FileCacheService', 'NativeService', '$window', function($q, $timeout, pouchdb, ErrorService, FileCacheService, NativeService, $window) {
+	
     var service = {};    
 
     var string = {       
         dbName: dbString? "cliplay_prod": "cliplay_dev_3_29",
-        remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",
+        remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",        
         file: dbString? dbString.split(",")[1]: "db.txt",
         dbAdapter: "websql",
         installFail: false
@@ -243,13 +261,16 @@ angular.module('app.services', [])
     
     var db = null;
 
-    var isPad = (typeof device !== 'undefined' && device.model.indexOf("iPad") !== -1)? true: false;
+//    var isPad = (typeof device !== 'undefined' && device.model.indexOf("iPad") !== -1)? true: false;
+	
+	var isPad = $window.innerHeight >= 700? true: false;
 
     var play = {
         postInfo: false,
         playInfo: false,            
         playPost: function(doc) {    
-            var data = [!this.postInfo, JSON.stringify(doc)];          
+//            var data = [!this.postInfo, JSON.stringify(doc)];          
+			var showTip = !this.postInfo;
             if(doc.image.length > 1 && !this.postInfo) {
                 this.postInfo = true;
                 db.get("_local/DBInstalled").then(function(doc){
@@ -257,44 +278,31 @@ angular.module('app.services', [])
                     return db.put(doc);
                 });         
             }
-            NativeService.play(data);         
+            NativeService.play(JSON.stringify(doc), showTip);
         },        
-        playPlay: function(list) {
-            var _list = list.slice();   
-            _list.unshift(!this.playInfo);         
-            if(list.length > 1 && !this.playInfo) {
-                this.playInfo = true;
-                db.get("_local/DBInstalled").then(function(doc){
-                    doc.playInfo = true;
-                    return db.put(doc);
-                });         
-            }            
-            NativeService.playPlay(_list);   
-        },
-        playArticle: function(doc) {          
-            // doc = {
-            //     image: [
-            //         {
-            //             // desc: "it will automatically choose a proper mode by whether you have set auto layout constrants on cell's content view. If you want to enforce frame layout mode, enable this property in your cell's configuration block. In your app, use CocoaPods to manage all of of your app dependencies. That is, don't manually drag-and-drop libraries. use CocoaPods to manage all of of your app dependencies. That is, don't manually drag-and-drop libraries",
-            //             url: "http://i3.hoopchina.com.cn/blogfile/201505/27/BbsImg143268736833456_300*168.gif"
-            //         }, 
-            //         {
-            //             // desc: "In your app, use CocoaPods to manage all of of your app dependencies. That is, don't manually drag-and-drop libraries",
-            //             url: "http://i2.hoopchina.com.cn/blogfile/201409/18/BbsImg141101102762427_230*166.gif"
-            //         }
-            //     ],
-            //     // header: "学明星投篮姿势，最重要的是学大体，大体决定的风格，而不是细节"
-            // };
-            var data = [!this.postInfo, JSON.stringify(doc)];
-            if(doc.image.length > 1 && !this.postInfo) {
-                this.postInfo = true;
-                db.get("_local/DBInstalled").then(function(doc){
-                    doc.postInfo = true;
-                    return db.put(doc);
-                });         
-            }
-            NativeService.playArticle(data);
-        }     
+//        playPlay: function(list) {
+//            var _list = list.slice();   
+//            _list.unshift(!this.playInfo);         
+//            if(list.length > 1 && !this.playInfo) {
+//                this.playInfo = true;
+//                db.get("_local/DBInstalled").then(function(doc){
+//                    doc.playInfo = true;
+//                    return db.put(doc);
+//                });         
+//            }            
+//            NativeService.playPlay(_list);   
+//        },
+//        playArticle: function(doc) {
+//            var data = [!this.postInfo, JSON.stringify(doc)];
+//            if(doc.image.length > 1 && !this.postInfo) {
+//                this.postInfo = true;
+//                db.get("_local/DBInstalled").then(function(doc){
+//                    doc.postInfo = true;
+//                    return db.put(doc);
+//                });         
+//            }
+//            NativeService.playArticle(data);
+//        }     
     };
 
     service.checkPush = function() {
@@ -1694,40 +1702,39 @@ angular.module('app.services', [])
         console.log(e)
     };
     
-    service.playAnimation = function(list) {
-        cordova.exec(win, fail, "MyHybridPlugin", "playClip", list);
-    };
+//    service.playAnimation = function(list) {
+//        cordova.exec(win, fail, "MyHybridPlugin", "playClip", list);
+//    };
+//
+//    service.playPlay = function(list) {        
+//        cordova.exec(win, fail, "MyHybridPlugin", "playPlay", list);
+//    };
+//
+//    service.playArticle = function(list) {        
+//        cordova.exec(win, fail, "MyHybridPlugin", "showArticle", list);
+//    };
+	
+//	 service.playAnimation = function(clipURL, favorite, showFavBut) {
+//	     favorite = favorite? "true": "false";
+//	     showFavBut = showFavBut? "true": "false";
+//	     cordova.exec(win, fail, "MyHybridPlugin", "playClip", [clipURL, favorite, showFavBut]);
+//	 };
 
-    service.playPlay = function(list) {        
-        cordova.exec(win, fail, "MyHybridPlugin", "playPlay", list);
-    };
-
-    service.playArticle = function(list) {        
-        cordova.exec(win, fail, "MyHybridPlugin", "showArticle", list);
-    };
-
-    service.play = function(list) {        
-        cordova.exec(win, fail, "MyHybridPlugin", "play", list);
+    service.play = function(list, showTip) {
+		HybridBridge.showList(list, showTip, win, fail);
     };
 
     service.checkPush = function() {
-        cordova.exec(win, fail, "MyHybridPlugin", "checkPush", []);
+		HybridBridge.checkPush();
     };
-
-    // service.playAnimation = function(clipURL, favorite, showFavBut) {
-    //     favorite = favorite? "true": "false";
-    //     showFavBut = showFavBut? "true": "false";
-    //     cordova.exec(win, fail, "MyHybridPlugin", "playClip", [clipURL, favorite, showFavBut]);
-    // };
-
-    service.showMessage = function(title, desc, retry) {        
-        var _retry = "false";
-        if(retry) {
-            _retry = "true";
-        }        
-        cordova.exec(win, fail, "MyHybridPlugin", "showMessage", [title, desc, _retry]);
-    }
-    
+	
+	service.showMessage = function(title, desc, clean) {
+		if(!clean) {
+			clean = false;
+		}
+		HybridBridge.showAlert(title, desc, clean);
+	}
+	
     return service;
 })
 
@@ -1751,9 +1758,8 @@ angular.module('app.services', [])
         }, 10);  
     };
 
-    service.showAlert = function(title, desc, retry) {
-        
-        NativeService.showMessage(title, desc? desc: "请稍后重试", retry);              
+    service.showAlert = function(title, desc, clean) {
+        NativeService.showMessage(title, desc? desc: "请稍后重试", clean);
     };
 
     service.showDownLoader = function() {
@@ -1783,7 +1789,7 @@ angular.module('app.services', [])
 
 angular.module('app.controllers', [])
 
-.controller('RootCtrl', ['$scope', '$state', '$timeout', function($scope, $state, $timeout) {
+.controller('RootCtrl', ['$scope', '$state', '$timeout', '$ionicHistory', function($scope, $state, $timeout, $ionicHistory) {
 	
 	(function() {
 		cacheViews();
@@ -1797,6 +1803,13 @@ angular.module('app.controllers', [])
 		// $state.go("tabsController.players");
 		$state.go("tabsController.news");
   	}
+  	
+  	if(ionic.Platform.isAndroid()) {
+  		$ionicHistory.nextViewOptions({
+        	disableAnimate: true,
+        	disableBack: true
+	    });
+  	}  	
 }])
 
 .controller('StarsCtrl', ['$scope', '$ionicSlideBoxDelegate', '$state', 'ErrorService', 'DBService', function($scope, $ionicSlideBoxDelegate, $state, ErrorService, DBService) {
@@ -2086,7 +2099,7 @@ angular.module('app.controllers', [])
 	};
 
 	$scope.showSkills = function(id, name) {	
-		$state.go("tabsController.skill", {catID: id, catName: name});	
+		$state.go("tabsController.skill", {catID: id, catName: name});
 	};
 }])
 
@@ -2137,19 +2150,33 @@ angular.module('app.directives', [])
     };
 }]);
 
+angular.element(document).ready(function () {
+    if (window.cordova) {
+        console.log("Running in Cordova, will bootstrap AngularJS once 'deviceready' event fires.");
+        
+        document.addEventListener('deviceready', function () {
+            console.log("Deviceready event has fired, bootstrapping AngularJS.");
+            startForIOS();
+        }, false);
+    } else {
+        console.log("Running in browser, bootstrapping AngularJS now.");        
+        angular.bootstrap(document.body, ['app']);
+    }
+});
+
 var dbString = "";
 
-function startForIOS() {
-    cordova.exec(
-        function(r){
-            dbString = r;
-            angular.bootstrap(document.body, ['app']);            
-        }, 
-        function(e){
-            console.log(e);
-        }, 
-        "MyHybridPlugin", "dbString"
-    );
+function startForIOS() {	
+	HybridBridge.getDBString(
+		function(r){
+			dbString = r;
+			angular.bootstrap(document.body, ['app']);
+		},
+		function(e)
+		{
+			console.log("Hybrid Bridge Error" + e)
+		}
+	);
 }
 
 function test() {
@@ -2183,17 +2210,3 @@ function retryInstall() {
     var scope = angular.element(document.getElementById('RootScopeID')).scope();
     scope.retry();
 }
-
-angular.element(document).ready(function () {
-    if (window.cordova) {
-        //console.log("Running in Cordova, will bootstrap AngularJS once 'deviceready' event fires.");
-        
-        document.addEventListener('deviceready', function () {
-            //console.log("Deviceready event has fired, bootstrapping AngularJS.");
-            startForIOS();
-        }, false);
-    } else {
-        //console.log("Running in browser, bootstrapping AngularJS now.");        
-        angular.bootstrap(document.body, ['app']);
-    }
-});

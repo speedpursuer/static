@@ -129,8 +129,8 @@
                 sync: db.replicate.sync.bind(db)
               },
               destroy: qify(db.destroy.bind(db)),
-              createIndex: qify(db.createIndex.bind(db)),
-              find: qify(db.find.bind(db)),
+              //createIndex: qify(db.createIndex.bind(db)),
+              //find: qify(db.find.bind(db)),
               on: qify(db.on.bind(db)),
               viewCleanup: qify(db.viewCleanup.bind(db)),
               load: qify(db.load.bind(db)),

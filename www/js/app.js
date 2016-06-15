@@ -19,10 +19,12 @@ angular.module('app', ['ionic', 'app.controllers', 'app.routes', 'app.services',
 
     $ionicConfigProvider.views.swipeBackEnabled(false);
     $ionicConfigProvider.scrolling.jsScrolling(false);
+    $ionicConfigProvider.tabs.position('bottom'); // other values: top
+    $ionicConfigProvider.tabs.style('standard');
     // $ionicConfigProvider.views.maxCache(20);
 }])
 
-.run(['$ionicPlatform', '$cordovaStatusbar', '$rootScope', function($ionicPlatform, $cordovaStatusbar, $rootScope) {
+.run(['$ionicPlatform', '$cordovaStatusbar', '$rootScope', '$ionicHistory', function($ionicPlatform, $cordovaStatusbar, $rootScope, $ionicHistory) {
     $ionicPlatform.ready(function() {
       // Hide the accessory bar by default (remove this to show the accessory bar above the keyboard
       // for form inputs)
@@ -44,6 +46,16 @@ angular.module('app', ['ionic', 'app.controllers', 'app.routes', 'app.services',
         console.log("stateChangeError: " + error);  
         event.preventDefault();
     });
+    
+    if(ionic.Platform.isAndroid()) {
+		$ionicPlatform.registerBackButtonAction(function () {
+	      if ($ionicHistory.backView()) {
+    	    navigator.app.backHistory();
+     	  }else {
+     	    HybridBridge.moveToBack();
+     	  }
+	    }, 100);
+	}
     
     /*
     window.addEventListener("orientationchange", function(){

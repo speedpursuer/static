@@ -1,6 +1,6 @@
 angular.module('app.controllers', [])
 
-.controller('RootCtrl', ['$scope', '$state', '$timeout', function($scope, $state, $timeout) {
+.controller('RootCtrl', ['$scope', '$state', '$timeout', '$ionicHistory', function($scope, $state, $timeout, $ionicHistory) {
 	
 	(function() {
 		cacheViews();
@@ -14,6 +14,13 @@ angular.module('app.controllers', [])
 		// $state.go("tabsController.players");
 		$state.go("tabsController.news");
   	}
+  	
+  	if(ionic.Platform.isAndroid()) {
+  		$ionicHistory.nextViewOptions({
+        	disableAnimate: true,
+        	disableBack: true
+	    });
+  	}  	
 }])
 
 .controller('StarsCtrl', ['$scope', '$ionicSlideBoxDelegate', '$state', 'ErrorService', 'DBService', function($scope, $ionicSlideBoxDelegate, $state, ErrorService, DBService) {
@@ -303,7 +310,7 @@ angular.module('app.controllers', [])
 	};
 
 	$scope.showSkills = function(id, name) {	
-		$state.go("tabsController.skill", {catID: id, catName: name});	
+		$state.go("tabsController.skill", {catID: id, catName: name});
 	};
 }])
 

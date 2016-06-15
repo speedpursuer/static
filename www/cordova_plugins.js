@@ -280,9 +280,17 @@ module.exports = [
         "clobbers": [
             "SQLitePlugin"
         ]
-    }
+    },
+	{
+	"file": "plugins/cordova-plugin-hybrid/www/HybridBridge.js",
+	"id": "cordova-plugin-hybrid.HybridBridge",
+	"pluginId": "cordova-plugin-hybrid.HybridBridge",
+	"clobbers": [
+			"HybridBridge"
+		]
+	}
 ];
-module.exports.metadata = 
+module.exports.metadata =
 // TOP OF METADATA
 {
     "cordova-plugin-console": "1.0.2",
@@ -297,7 +305,8 @@ module.exports.metadata =
     "cordova-plugin-webserver": "1.0.3",
     "com.telerik.plugins.wkwebview": "0.6.7",
     "com.phonegap.plugins.sqlite": "0.7.0",
-	"cordova-plugin-network-information": "1.2.0"
+	"cordova-plugin-network-information": "1.2.0",
+	"cordova-plugin-hybrid": "1.0.0"
 }
 // BOTTOM OF METADATA
 });

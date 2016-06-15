@@ -14,18 +14,17 @@ angular.element(document).ready(function () {
 
 var dbString = "";
 
-function startForIOS() {
-    cordova.exec(
-        function(r){
-            //console.log("dbstring = " + r);
-            dbString = r;
-            angular.bootstrap(document.body, ['app']);            
-        }, 
-        function(e){
-            console.log(e);
-        }, 
-        "MyHybridPlugin", "dbString"
-    );
+function startForIOS() {	
+	HybridBridge.getDBString(
+		function(r){
+			dbString = r;
+			angular.bootstrap(document.body, ['app']);
+		},
+		function(e)
+		{
+			console.log("Hybrid Bridge Error" + e)
+		}
+	);
 }
 
 function test() {

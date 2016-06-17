@@ -19,6 +19,98 @@ angular.module('app.services', [])
     var db = null;
 
     var isPad = (typeof device !== 'undefined' && device.model.indexOf("iPad") !== -1)? true: false;
+
+    var dataProcess = {
+
+        init: function() {
+
+            var dbName = "new_cliplay";
+
+            var remoteURL = "http://admin:12341234@localhost:5984/cliplay_new_db_dev";
+
+            var newDB = "http://cliplay_editor:iPhone5S@121.40.197.226:4984/cliplay_prod_new"
+
+            var that = this;
+
+            db = pouchdb.create(dbName);      
+
+            var promises = [];                            
+
+            db.destroy().then(function(){
+                db = pouchdb.create(dbName);       
+                return db;
+            }).then(function(){
+                return db.replicate.from(remoteURL);
+            }).then(function(){                
+                return db.allDocs({
+                    include_docs: true,
+                    startkey: "galery",
+                    endkey: "galery\uffff"            
+                });
+            }).then(function (result) {              
+                return that.updateDoc(result, promises);
+            }).then(function(){                
+                return db.allDocs({
+                    include_docs: true,
+                    startkey: "news",
+                    endkey: "news\uffff"            
+                });
+            }).then(function (result) {              
+                return that.updateDoc(result, promises);
+            }).then(function(){                
+                return db.allDocs({
+                    include_docs: true,
+                    startkey: "post",
+                    endkey: "post\uffff"            
+                });
+            }).then(function (result) {              
+                return that.updateDoc(result, promises);
+            }).then(function() {
+                return executePromises(promises);
+            }).then(function() {
+                return db.replicate.to(newDB);
+            }).then(function() {            
+                console.log("dataProcess success");
+            }).catch(function (err) {
+                console.log("dataProcess failed = " + err);
+            });          
+        },
+
+        updateDoc: function(result, promises) {
+            for(i in result.rows) {
+                var doc = result.rows[i].doc;
+                promises.push(this.updateImg(doc));                        
+            }
+            return true;
+        },
+
+        updateImg: function(doc) {
+
+            var deferred = $q.defer();
+
+            var image_org = doc.image;
+            var image_new = [];
+
+            for(i in image_org) {
+                image_new.push(
+                    {
+                        desc: "",
+                        url: image_org[i]
+                    }
+                ); 
+            }
+            doc.image = image_new;
+            doc.summary = "";
+
+            db.put(doc).then(function() {
+                deferred.resolve("New doc saved");            
+            }).catch(function(err) {
+                deferred.reject(err);
+            });    
+
+            return deferred.promise;        
+        },
+    };
     
     var dataTransfer = {
 

@@ -1,6 +1,5 @@
 <ion-view title="巨星集锦" hide-nav-bar="false" hide-tabs="false">      
-    <!-- <ion-content overflow-scroll="true" padding="false" has-header="true">          -->
-    <ion-content>         
+    <ion-content overflow-scroll="true" padding="false" has-header="true">         
          <ion-slide-box>
           <ion-slide ng-repeat="item in stars | orderBy: 'star'" ng-click='showMoves(item._id, item.name)'>                     
             <div class="box blue" img-cache-bg ic-bg="{{item.image}}"><h1>{{item.name_en}}</h1></div>

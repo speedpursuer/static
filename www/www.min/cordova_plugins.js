@@ -280,7 +280,15 @@ module.exports = [
         "clobbers": [
             "SQLitePlugin"
         ]
-    }
+    },
+	{
+	"file": "plugins/cordova-plugin-hybrid/www/HybridBridge.js",
+	"id": "cordova-plugin-hybrid.HybridBridge",
+	"pluginId": "cordova-plugin-hybrid.HybridBridge",
+	"clobbers": [
+			"HybridBridge"
+		]
+	}
 ];
 module.exports.metadata = 
 // TOP OF METADATA

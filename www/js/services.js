@@ -5,10 +5,10 @@ angular.module('app.services', [])
 	
     var service = {};    
 
-    var string = {       
-        dbName: dbString? "cliplay_prod": "cliplay_dev_3_29",
+    var string = {               
         remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",        
         file: dbString? dbString.split(",")[1]: "db.txt",
+        dbName: dbString? dbString.split(",")[2]: "cliplay_new_db_dev_6_15",
         dbAdapter: "websql",
         installFail: false
     }
@@ -900,6 +900,7 @@ angular.module('app.services', [])
 
         // dataTransfer.transfer(); return;        
         // dataProcess.init(); return;
+
         createDB();        
                 
         isDBInstalled().then(function(result) {       
@@ -1488,6 +1489,10 @@ angular.module('app.services', [])
 		}
 		HybridBridge.showAlert(title, desc, clean);
 	}
+
+    service.showFavorite = function() {        
+        HybridBridge.showFavorite();
+    }
 	
     return service;
 })

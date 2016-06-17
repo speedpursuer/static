@@ -411,7 +411,6 @@ var ImgCache = {
             }
         };
         var xhr = new XMLHttpRequest();
-        xhr.timeout = 200;
         xhr.open('GET', uri, true);
         if (isOnProgressAvailable) {
             xhr.onprogress = on_progress;
@@ -434,9 +433,6 @@ var ImgCache = {
             }
         };
         xhr.onerror = function () {
-            _fail('XHR error - Image ' + uri + ' could not be downloaded - status: ' + xhr.status, 3, error_callback);
-        };
-        xhr.ontimeout = function () {
             _fail('XHR error - Image ' + uri + ' could not be downloaded - status: ' + xhr.status, 3, error_callback);
         };
         xhr.send();

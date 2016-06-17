@@ -231,7 +231,7 @@ angular.module('app.controllers', [])
 
 }])
 
-.controller('NewsCtrl', ['$scope', '$state', '$stateParams', 'DBService', 'ErrorService', '$timeout', function($scope, $state, $stateParams, DBService, ErrorService, $timeout) {	
+.controller('NewsCtrl', ['$scope', '$state', '$stateParams', 'DBService', 'ErrorService', '$timeout', 'NativeService', function($scope, $state, $stateParams, DBService, ErrorService, $timeout, NativeService) {	
 
 	$scope.noMoreItemsAvailable = DBService.pagination().news().hasNoMore();
  	$scope.news = DBService.list().getNewsList();
@@ -266,6 +266,10 @@ angular.module('app.controllers', [])
 
 	$scope.cleanCache = function() {
 		ErrorService.showAlert("删除已下载短片", "释放磁盘空间", true);
+	};
+
+	$scope.showFavorite = function() {
+		NativeService.showFavorite();
 	};
 
 	$scope.$on("$ionicView.loaded", function() {

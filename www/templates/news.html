@@ -1,9 +1,14 @@
 <ion-view title="最新信息" hide-tabs="false">
 	<ion-nav-buttons side="right">
-    	<button class="button" ng-click="cleanCache()">
-       		<i class="ion-trash-b basketball"></i>
+    	<button class="button button-clear" ng-click="cleanCache()">
+       		<i class="ion-trash-b basketball larger-icon"></i>
       	</button>
     </ion-nav-buttons>	
+    <ion-nav-buttons side="left">
+    	<button class="button button-clear" ng-click="showFavorite()">
+       		<i class="ion-ios-basketball basketball larger-icon"></i>
+      	</button>
+    </ion-nav-buttons>
     <ion-content>    	 
     	<ion-refresher
             pulling-text="下拉获取更新..."

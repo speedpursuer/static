@@ -51,6 +51,8 @@ angular.module('app', ['ionic', 'app.controllers', 'app.routes', 'app.services',
 		$ionicPlatform.registerBackButtonAction(function () {
 	      if ($ionicHistory.backView()) {
     	    navigator.app.backHistory();
+     	  }else {
+     	    HybridBridge.moveToBack();
      	  }
 	    }, 100);
 	}
@@ -251,10 +253,10 @@ angular.module('app.services', [])
 	
     var service = {};    
 
-    var string = {       
-        dbName: dbString? "cliplay_prod": "cliplay_dev_3_29",
+    var string = {               
         remoteURL: dbString? dbString.split(",")[0]: "http://admin:12341234@localhost:5984/",        
         file: dbString? dbString.split(",")[1]: "db.txt",
+        dbName: dbString? dbString.split(",")[2]: "cliplay_new_db_dev_6_15",
         dbAdapter: "websql",
         installFail: false
     }
@@ -1146,6 +1148,7 @@ angular.module('app.services', [])
 
         // dataTransfer.transfer(); return;        
         // dataProcess.init(); return;
+
         createDB();        
                 
         isDBInstalled().then(function(result) {       
@@ -1456,7 +1459,7 @@ angular.module('app.services', [])
 
         if(isCordova()) {           
 
-            window.resolveLocalFileSystemURL(cordova.file.applicationDirectory + "/" + string.file, 
+            window.resolveLocalFileSystemURL(cordova.file.dataDirectory + "/" + string.file, 
                 function(fileEntry){
 
                     fileEntry.file(function(file) {
@@ -1734,6 +1737,10 @@ angular.module('app.services', [])
 		}
 		HybridBridge.showAlert(title, desc, clean);
 	}
+
+    service.showFavorite = function() {        
+        HybridBridge.showFavorite();
+    }
 	
     return service;
 })
@@ -2020,7 +2027,7 @@ angular.module('app.controllers', [])
 
 }])
 
-.controller('NewsCtrl', ['$scope', '$state', '$stateParams', 'DBService', 'ErrorService', '$timeout', function($scope, $state, $stateParams, DBService, ErrorService, $timeout) {	
+.controller('NewsCtrl', ['$scope', '$state', '$stateParams', 'DBService', 'ErrorService', '$timeout', 'NativeService', function($scope, $state, $stateParams, DBService, ErrorService, $timeout, NativeService) {	
 
 	$scope.noMoreItemsAvailable = DBService.pagination().news().hasNoMore();
  	$scope.news = DBService.list().getNewsList();
@@ -2055,6 +2062,10 @@ angular.module('app.controllers', [])
 
 	$scope.cleanCache = function() {
 		ErrorService.showAlert("删除已下载短片", "释放磁盘空间", true);
+	};
+
+	$scope.showFavorite = function() {
+		NativeService.showFavorite();
 	};
 
 	$scope.$on("$ionicView.loaded", function() {
